@@ -16,11 +16,12 @@
  */
 package org.apache.rocketmq.common;
 
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.logging.InternalLoggerFactory;
+
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public abstract class ServiceThread implements Runnable {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.COMMON_LOGGER_NAME);
@@ -80,7 +81,7 @@ public abstract class ServiceThread implements Runnable {
             }
             long elapsedTime = System.currentTimeMillis() - beginTime;
             log.info("join thread " + this.getServiceName() + " elapsed time(ms) " + elapsedTime + " "
-                + this.getJointime());
+                    + this.getJointime());
         } catch (InterruptedException e) {
             log.error("Interrupted", e);
         }
@@ -127,15 +128,19 @@ public abstract class ServiceThread implements Runnable {
     }
 
     protected void waitForRunning(long interval) {
+        //将通知状态改为false
         if (hasNotified.compareAndSet(true, false)) {
-            this.onWaitEnd();
+            //进入此处说明没有通知，即将结束等待继续执行
+            this.onWaitEnd();//等待结束是触发
             return;
         }
+        //到此处说明需要等待
 
         //entry to wait
-        waitPoint.reset();
+        waitPoint.reset();//重置CountDown
 
         try {
+            //限时等待一段时间
             waitPoint.await(interval, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             log.error("Interrupted", e);

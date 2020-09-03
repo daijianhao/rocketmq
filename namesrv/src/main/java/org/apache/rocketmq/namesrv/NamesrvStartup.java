@@ -42,6 +42,9 @@ import java.io.InputStream;
 import java.util.Properties;
 import java.util.concurrent.Callable;
 
+/**
+ * 名称服务器启动类
+ */
 public class NamesrvStartup {
 
     private static InternalLogger log;
@@ -55,6 +58,7 @@ public class NamesrvStartup {
     public static NamesrvController main0(String[] args) {
 
         try {
+            //创建controller
             NamesrvController controller = createNamesrvController(args);
             start(controller);
             String tip = "The Name Server boot success. serializeType=" + RemotingCommand.getSerializeTypeConfigInThisServer();
@@ -70,6 +74,7 @@ public class NamesrvStartup {
     }
 
     public static NamesrvController createNamesrvController(String[] args) throws IOException, JoranException {
+        //设置版本属性
         System.setProperty(RemotingCommand.REMOTING_VERSION_KEY, Integer.toString(MQVersion.CURRENT_VERSION));
         //PackageConflictDetect.detectFastjson();
 
@@ -118,16 +123,17 @@ public class NamesrvStartup {
         JoranConfigurator configurator = new JoranConfigurator();
         configurator.setContext(lc);
         lc.reset();
+        //读取logback配置
         configurator.doConfigure(namesrvConfig.getRocketmqHome() + "/conf/logback_namesrv.xml");
 
         log = InternalLoggerFactory.getLogger(LoggerName.NAMESRV_LOGGER_NAME);
 
         MixAll.printObjectProperties(log, namesrvConfig);
         MixAll.printObjectProperties(log, nettyServerConfig);
-
+        //创建controller
         final NamesrvController controller = new NamesrvController(namesrvConfig, nettyServerConfig);
 
-        // remember all configs to prevent discard
+        // remember all configs to prevent discard,将文件中的配置项记录在controller的配置中
         controller.getConfiguration().registerConfig(properties);
 
         return controller;
@@ -138,21 +144,23 @@ public class NamesrvStartup {
         if (null == controller) {
             throw new IllegalArgumentException("NamesrvController is null");
         }
-
+        //初始化
         boolean initResult = controller.initialize();
         if (!initResult) {
             controller.shutdown();
             System.exit(-3);
         }
 
+        //设置应用shutdown的回调
         Runtime.getRuntime().addShutdownHook(new ShutdownHookThread(log, new Callable<Void>() {
             @Override
             public Void call() throws Exception {
+                //关闭controller
                 controller.shutdown();
                 return null;
             }
         }));
-
+        //启动
         controller.start();
 
         return controller;

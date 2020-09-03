@@ -19,6 +19,9 @@ package org.apache.rocketmq.logging;
 
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * 内部日志工厂抽象类，实现不同日志框架的统一处理
+ */
 public abstract class InternalLoggerFactory {
 
     public static final String LOGGER_SLF4J = "slf4j";

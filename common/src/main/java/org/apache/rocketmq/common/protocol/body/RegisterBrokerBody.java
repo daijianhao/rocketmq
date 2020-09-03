@@ -44,38 +44,46 @@ public class RegisterBrokerBody extends RemotingSerializable {
     private TopicConfigSerializeWrapper topicConfigSerializeWrapper = new TopicConfigSerializeWrapper();
     private List<String> filterServerList = new ArrayList<String>();
 
+    /**
+     * 编码
+     */
     public byte[] encode(boolean compress) {
 
+        //未压缩，直接调用父类的编码
         if (!compress) {
             return super.encode();
         }
         long start = System.currentTimeMillis();
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        //创建zlib压缩流
         DeflaterOutputStream outputStream = new DeflaterOutputStream(byteArrayOutputStream, new Deflater(Deflater.BEST_COMPRESSION));
+        //获取数据版本
         DataVersion dataVersion = topicConfigSerializeWrapper.getDataVersion();
+        //克隆配置表
         ConcurrentMap<String, TopicConfig> topicConfigTable = cloneTopicConfigTable(topicConfigSerializeWrapper.getTopicConfigTable());
         assert topicConfigTable != null;
         try {
+            //先序列化版本号
             byte[] buffer = dataVersion.encode();
 
-            // write data version
+            // write data version，写入版本信息
             outputStream.write(convertIntToByteArray(buffer.length));
             outputStream.write(buffer);
 
             int topicNumber = topicConfigTable.size();
 
-            // write number of topic configs
+            // write number of topic configs，写入topic配置数
             outputStream.write(convertIntToByteArray(topicNumber));
 
-            // write topic config entry one by one.
+            // write topic config entry one by one.写入具体配置项
             for (ConcurrentMap.Entry<String, TopicConfig> next : topicConfigTable.entrySet()) {
                 buffer = next.getValue().encode().getBytes(MixAll.DEFAULT_CHARSET);
                 outputStream.write(convertIntToByteArray(buffer.length));
                 outputStream.write(buffer);
             }
-
             buffer = JSON.toJSONString(filterServerList).getBytes(MixAll.DEFAULT_CHARSET);
 
+            //过滤器Server信息
             // write filter server list json length
             outputStream.write(convertIntToByteArray(buffer.length));
 
@@ -95,11 +103,17 @@ public class RegisterBrokerBody extends RemotingSerializable {
         return null;
     }
 
+    /**
+     * 解码
+     * encode的反过程
+     */
     public static RegisterBrokerBody decode(byte[] data, boolean compressed) throws IOException {
         if (!compressed) {
+            //未压缩 直接解码
             return RegisterBrokerBody.decode(data, RegisterBrokerBody.class);
         }
         long start = System.currentTimeMillis();
+        //压缩输入流
         InflaterInputStream inflaterInputStream = new InflaterInputStream(new ByteArrayInputStream(data));
         int dataVersionLength = readInt(inflaterInputStream);
         byte[] dataVersionBytes = readBytes(inflaterInputStream, dataVersionLength);
