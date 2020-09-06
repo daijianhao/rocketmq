@@ -38,6 +38,9 @@ public class ClientConfig {
     private String clientIP = RemotingUtil.getLocalAddress();
     private String instanceName = System.getProperty("rocketmq.client.name", "DEFAULT");
     private int clientCallbackExecutorThreads = Runtime.getRuntime().availableProcessors();
+    /**
+     * todo 名称空间有啥用？隔离？
+     */
     protected String namespace;
     protected AccessChannel accessChannel = AccessChannel.LOCAL;
 
@@ -55,6 +58,9 @@ public class ClientConfig {
     private int persistConsumerOffsetInterval = 1000 * 5;
     private long pullTimeDelayMillsWhenException = 1000;
     private boolean unitMode = false;
+    /**
+     * todo unit干嘛用的
+     */
     private String unitName;
     private boolean vipChannelEnabled = Boolean.parseBoolean(System.getProperty(SEND_MESSAGE_WITH_VIP_CHANNEL_PROPERTY, "false"));
 

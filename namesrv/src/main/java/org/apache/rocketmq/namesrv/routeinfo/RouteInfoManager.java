@@ -809,6 +809,9 @@ class BrokerLiveInfo {
     private long lastUpdateTimestamp;
     private DataVersion dataVersion;
     private Channel channel;
+    /**
+     * todo HaServer具体是干嘛用的 后面解答
+     */
     private String haServerAddr;
 
     public BrokerLiveInfo(long lastUpdateTimestamp, DataVersion dataVersion, Channel channel,

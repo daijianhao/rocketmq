@@ -49,16 +49,19 @@ public class Validators {
 
     /**
      * Validate group
+     * 校验group
      */
     public static void checkGroup(String group) throws MQClientException {
+        //是否为空
         if (UtilAll.isBlank(group)) {
             throw new MQClientException("the specified group is blank", null);
         }
-
+        //是否超过最大长度限制
         if (group.length() > CHARACTER_MAX_LENGTH) {
             throw new MQClientException("the specified group is longer than group max length 255.", null);
         }
 
+        //是否满足规范
         if (!regularExpressionMatcher(group, PATTERN)) {
             throw new MQClientException(String.format(
                 "the specified group[%s] contains illegal characters, allowing only %s", group,
@@ -83,8 +86,9 @@ public class Validators {
         if (null == msg) {
             throw new MQClientException(ResponseCode.MESSAGE_ILLEGAL, "the message is null");
         }
-        // topic
+        // topic 检查topic是否满足
         Validators.checkTopic(msg.getTopic());
+        //是否发送到系统保留的topic
         Validators.isNotAllowedSendTopic(msg.getTopic());
 
         // body

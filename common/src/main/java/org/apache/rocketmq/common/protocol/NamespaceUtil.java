@@ -81,18 +81,25 @@ public class NamespaceUtil {
         return resourceWithNamespace;
     }
 
+    /**
+     * 在指定资源前拼接名称空间
+     */
     public static String wrapNamespace(String namespace, String resourceWithOutNamespace) {
         if (StringUtils.isEmpty(namespace) || StringUtils.isEmpty(resourceWithOutNamespace)) {
+            //为空直接返回
             return resourceWithOutNamespace;
         }
 
         if (isSystemResource(resourceWithOutNamespace) || isAlreadyWithNamespace(resourceWithOutNamespace, namespace)) {
+            //如果是系统资源或者已经包含了名称空间
             return resourceWithOutNamespace;
         }
 
+        //如果是重试队列或者死信队列则截取前面的前缀
         String resourceWithoutRetryAndDLQ = withOutRetryAndDLQ(resourceWithOutNamespace);
         StringBuilder stringBuilder = new StringBuilder();
 
+        //todo 为什么截取了又拼接？
         if (isRetryTopic(resourceWithOutNamespace)) {
             stringBuilder.append(MixAll.RETRY_GROUP_TOPIC_PREFIX);
         }
@@ -106,12 +113,13 @@ public class NamespaceUtil {
     }
 
     public static boolean isAlreadyWithNamespace(String resource, String namespace) {
+        //判断是否是系统资源
         if (StringUtils.isEmpty(namespace) || StringUtils.isEmpty(resource) || isSystemResource(resource)) {
             return false;
         }
-
+        //如果是死信队列或重试队列，就把前面的前缀截取掉
         String resourceWithoutRetryAndDLQ = withOutRetryAndDLQ(resource);
-
+        //截取掉之后再次判断是否已经包含了名称空间
         return resourceWithoutRetryAndDLQ.startsWith(namespace + NAMESPACE_SEPARATOR);
     }
 

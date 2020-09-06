@@ -24,14 +24,19 @@ import org.apache.rocketmq.remoting.common.RemotingHelper;
 
 /**
  * This class demonstrates how to send messages to brokers using provided {@link DefaultMQProducer}.
+ * <p>
+ * 发送消息示例
  */
 public class Producer {
     public static void main(String[] args) throws MQClientException, InterruptedException {
 
         /*
          * Instantiate with a producer group name.
+         * 指定producer所在组名
+         * todo 这个组名有啥用
          */
         DefaultMQProducer producer = new DefaultMQProducer("please_rename_unique_group_name");
+        //设置名称服务地址
         producer.setNamesrvAddr("localhost:9876");
         /*
          * Specify name server addresses.
@@ -47,6 +52,7 @@ public class Producer {
 
         /*
          * Launch the instance.
+         * 启动
          */
         producer.start();
 
@@ -55,14 +61,16 @@ public class Producer {
 
                 /*
                  * Create a message instance, specifying topic, tag and message body.
+                 *
                  */
                 Message msg = new Message("TopicTest" /* Topic */,
-                    "TagA" /* Tag */,
-                    ("Hello RocketMQ " + i).getBytes(RemotingHelper.DEFAULT_CHARSET) /* Message body */
+                        "TagA" /* Tag */,
+                        ("Hello RocketMQ " + i).getBytes(RemotingHelper.DEFAULT_CHARSET) /* Message body */
                 );
 
                 /*
                  * Call send message to deliver message to one of brokers.
+                 * 发送消息
                  */
                 SendResult sendResult = producer.send(msg);
 
@@ -76,6 +84,7 @@ public class Producer {
 
         /*
          * Shut down once the producer instance is not longer in use.
+         * 关闭
          */
         producer.shutdown();
     }

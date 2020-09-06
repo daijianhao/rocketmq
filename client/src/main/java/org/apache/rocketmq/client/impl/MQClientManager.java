@@ -25,10 +25,19 @@ import org.apache.rocketmq.client.log.ClientLogger;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.remoting.RPCHook;
 
+/**
+ * mq 客户端管理器，单例
+ */
 public class MQClientManager {
     private final static InternalLogger log = ClientLogger.getLog();
+    /**
+     * 单例
+     */
     private static MQClientManager instance = new MQClientManager();
     private AtomicInteger factoryIndexGenerator = new AtomicInteger();
+    /**
+     * 维护客户端ID与实例的映射
+     */
     private ConcurrentMap<String/* clientId */, MQClientInstance> factoryTable =
         new ConcurrentHashMap<String, MQClientInstance>();
 
@@ -40,12 +49,20 @@ public class MQClientManager {
         return instance;
     }
 
+    /**
+     * 获取或创建一个客户端实例
+     * @param clientConfig
+     * @return
+     */
     public MQClientInstance getOrCreateMQClientInstance(final ClientConfig clientConfig) {
         return getOrCreateMQClientInstance(clientConfig, null);
     }
 
     public MQClientInstance getOrCreateMQClientInstance(final ClientConfig clientConfig, RPCHook rpcHook) {
+        //客户端ID 类似：172.16.210.66@1572,ip@port@unitName
+        //目前unitName貌似没有用到，todo unitName貌似用来区分多个环境
         String clientId = clientConfig.buildMQClientId();
+        //从缓存中取，取不到则创建
         MQClientInstance instance = this.factoryTable.get(clientId);
         if (null == instance) {
             instance =

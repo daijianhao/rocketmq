@@ -164,6 +164,9 @@ import org.apache.rocketmq.remoting.protocol.LanguageCode;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
 
+/**
+ * 封装远程通信能力，底层委托netty实现通信
+ */
 public class MQClientAPIImpl {
 
     private final static InternalLogger log = ClientLogger.getLog();

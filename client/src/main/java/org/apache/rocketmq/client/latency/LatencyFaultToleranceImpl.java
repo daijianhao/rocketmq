@@ -17,14 +17,18 @@
 
 package org.apache.rocketmq.client.latency;
 
+import org.apache.rocketmq.client.common.ThreadLocalIndex;
+
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
-import org.apache.rocketmq.client.common.ThreadLocalIndex;
 
 public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> {
+    /**
+     * 记录了brokerName不可用的时间
+     */
     private final ConcurrentHashMap<String, FaultItem> faultItemTable = new ConcurrentHashMap<String, FaultItem>(16);
 
     private final ThreadLocalIndex whichItemWorst = new ThreadLocalIndex();
@@ -72,14 +76,17 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
         }
 
         if (!tmpList.isEmpty()) {
+            //随机打乱
             Collections.shuffle(tmpList);
-
+            //最可用的排前面
             Collections.sort(tmpList);
 
             final int half = tmpList.size() / 2;
             if (half <= 0) {
+                //只有1个
                 return tmpList.get(0).getName();
             } else {
+                //todo 没懂
                 final int i = this.whichItemWorst.getAndIncrement() % half;
                 return tmpList.get(i).getName();
             }
@@ -91,14 +98,23 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
     @Override
     public String toString() {
         return "LatencyFaultToleranceImpl{" +
-            "faultItemTable=" + faultItemTable +
-            ", whichItemWorst=" + whichItemWorst +
-            '}';
+                "faultItemTable=" + faultItemTable +
+                ", whichItemWorst=" + whichItemWorst +
+                '}';
     }
 
     class FaultItem implements Comparable<FaultItem> {
+        /**
+         * brokername
+         */
         private final String name;
+        /**
+         * 当前延时
+         */
         private volatile long currentLatency;
+        /**
+         * 下次可用时间戳
+         */
         private volatile long startTimestamp;
 
         public FaultItem(final String name) {
@@ -162,10 +178,10 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
         @Override
         public String toString() {
             return "FaultItem{" +
-                "name='" + name + '\'' +
-                ", currentLatency=" + currentLatency +
-                ", startTimestamp=" + startTimestamp +
-                '}';
+                    "name='" + name + '\'' +
+                    ", currentLatency=" + currentLatency +
+                    ", startTimestamp=" + startTimestamp +
+                    '}';
         }
 
         public String getName() {
