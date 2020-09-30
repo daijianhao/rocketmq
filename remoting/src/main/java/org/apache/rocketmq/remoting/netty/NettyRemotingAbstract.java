@@ -429,17 +429,18 @@ public abstract class NettyRemotingAbstract {
                     log.warn("send a request command to channel <" + addr + "> failed.");
                 }
             });
-
+            //等待
             RemotingCommand responseCommand = responseFuture.waitResponse(timeoutMillis);
             if (null == responseCommand) {
                 if (responseFuture.isSendRequestOK()) {
+                    //发送成功，但未收到响应抛出超时异常
                     throw new RemotingTimeoutException(RemotingHelper.parseSocketAddressAddr(addr), timeoutMillis,
                         responseFuture.getCause());
                 } else {
                     throw new RemotingSendRequestException(RemotingHelper.parseSocketAddressAddr(addr), responseFuture.getCause());
                 }
             }
-
+            //成功返回
             return responseCommand;
         } finally {
             this.responseTable.remove(opaque);

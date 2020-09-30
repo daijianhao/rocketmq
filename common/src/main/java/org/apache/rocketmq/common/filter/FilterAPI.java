@@ -36,6 +36,14 @@ public class FilterAPI {
         return simple;
     }
 
+    /**
+     * 构建订阅信息
+     * @param consumerGroup 消费组
+     * @param topic 订阅主题
+     * @param subString 子过滤表达式
+     * @return
+     * @throws Exception
+     */
     public static SubscriptionData buildSubscriptionData(final String consumerGroup, String topic,
         String subString) throws Exception {
         SubscriptionData subscriptionData = new SubscriptionData();
@@ -43,6 +51,7 @@ public class FilterAPI {
         subscriptionData.setSubString(subString);
 
         if (null == subString || subString.equals(SubscriptionData.SUB_ALL) || subString.length() == 0) {
+            //没有则设置全部匹配通配符
             subscriptionData.setSubString(SubscriptionData.SUB_ALL);
         } else {
             String[] tags = subString.split("\\|\\|");
@@ -51,6 +60,7 @@ public class FilterAPI {
                     if (tag.length() > 0) {
                         String trimString = tag.trim();
                         if (trimString.length() > 0) {
+                            //设置tag
                             subscriptionData.getTagsSet().add(trimString);
                             subscriptionData.getCodeSet().add(trimString.hashCode());
                         }

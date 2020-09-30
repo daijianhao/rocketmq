@@ -16,29 +16,67 @@
  */
 package org.apache.rocketmq.client.impl.consumer;
 
-import java.util.List;
 import org.apache.rocketmq.common.message.MessageExt;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.common.protocol.body.ConsumeMessageDirectlyResult;
 
+import java.util.List;
+
+/**
+ * 消息消费服务
+ */
 public interface ConsumeMessageService {
+    /**
+     * 启动
+     */
     void start();
 
     void shutdown(long awaitTerminateMillis);
 
+    /**
+     * 更新核心线程数
+     *
+     * @param corePoolSize
+     */
     void updateCorePoolSize(int corePoolSize);
 
+    /**
+     * 增加核心线程数
+     */
     void incCorePoolSize();
 
+    /**
+     * 减少核心线程数
+     */
     void decCorePoolSize();
 
+    /**
+     * 获取核心线程数
+     *
+     * @return
+     */
     int getCorePoolSize();
 
+    /**
+     * 直接消费消息
+     *
+     * @param msg
+     * @param brokerName
+     * @return
+     */
     ConsumeMessageDirectlyResult consumeMessageDirectly(final MessageExt msg, final String brokerName);
 
+    /**
+     * 提交消费请求
+     *
+     * @param msgs
+     * @param processQueue
+     * @param messageQueue
+     * @param dispathToConsume
+     */
     void submitConsumeRequest(
-        final List<MessageExt> msgs,
-        final ProcessQueue processQueue,
-        final MessageQueue messageQueue,
-        final boolean dispathToConsume);
+            final List<MessageExt> msgs,
+            final ProcessQueue processQueue,
+            final MessageQueue messageQueue,
+            final boolean dispathToConsume);
 }

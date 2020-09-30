@@ -25,6 +25,11 @@ import org.apache.rocketmq.remoting.exception.RemotingException;
 
 /**
  * Pulling consumer interface
+ *
+ * 拉取式消费（Pull Consumer）
+ * Consumer消费的一种类型，应用通常主动调用Consumer的拉消息方法从Broker服务器拉消息、主动权由应用控制。
+ * 一旦获取了批量消息，应用就会启动消费过程。
+ * 相当于使用者要显示调用拉取消息，MQPushConsumer的实现实际上是基于Pull的方式
  */
 public interface MQPullConsumer extends MQConsumer {
     /**

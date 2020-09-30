@@ -118,14 +118,24 @@ public class MQClientInstance {
         this.clientId = clientId;
 
         this.mQAdminImpl = new MQAdminImpl(this);
-
+        //Pull请求服务，异步发送请求到broker并负责将返回结果放到缓存队列
         this.pullMessageService = new PullMessageService(this);
-
+        //定时或者被触发做subscribe queue的re-balance
+        /**
+         * RebalanceService的任务主要是调用RebalanceImpl，来给consumer重新调整和分配queue。
+         *
+         * 定时触发(20sec)做rebalance
+         * 接口触发：
+         * 1）收到broker的consumer list发生变化通知后需要重新做负载均衡，比如同一个group中新加入了consumer或者有consumer下线；
+         * 2）consumer启动的时候
+         * 从以上的PushConsumer启动逻辑可以看出，主要的消息读取逻辑都是由RebalanceImpl完成的，通过调用doRebalance()来触发
+         *
+         */
         this.rebalanceService = new RebalanceService(this);
-
+        //初始化一个自用的producer，`CLIENT_INNER_PRODUCER`,todo 主要用于在消费失败或者超时后发送重试的消息给broker
         this.defaultMQProducer = new DefaultMQProducer(MixAll.CLIENT_INNER_PRODUCER_GROUP);
         this.defaultMQProducer.resetClientConfig(clientConfig);
-
+        //todo 消费状态管理器
         this.consumerStatsManager = new ConsumerStatsManager(this.scheduledExecutorService);
 
         log.info("Created a new client Instance, InstanceIndex:{}, ClientID:{}, ClientConfig:{}, ClientVersion:{}, SerializerType:{}",
@@ -230,10 +240,10 @@ public class MQClientInstance {
                     // 4、Start pull service,开始处理PullRequest
                     this.pullMessageService.start();
                     // Start rebalance service
-                    // 5、Start rebalance service
+                    // 5、Start rebalance service ，consumer使用的
                     this.rebalanceService.start();
                     // Start push service
-                    //6、启动Client内置的producer
+                    //6、启动Client内置的producer，在消息重发时有用
                     this.defaultMQProducer.getDefaultMQProducerImpl().start(false);
                     log.info("the client factory [{}] start OK", this.clientId);
                     this.serviceState = ServiceState.RUNNING;
@@ -292,6 +302,7 @@ public class MQClientInstance {
             }
         }, 1000, this.clientConfig.getHeartbeatBrokerInterval(), TimeUnit.MILLISECONDS);
 
+        //保存消费进度，广播消息存在本地，集群消息上传到所有的broker
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -304,7 +315,7 @@ public class MQClientInstance {
             }
         }, 1000 * 10, this.clientConfig.getPersistConsumerOffsetInterval(), TimeUnit.MILLISECONDS);
 
-        //定时调整线程池
+        //对于`PushConsumer`，根据负载调整本地处理消息的线程池corePool大小
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -465,10 +476,16 @@ public class MQClientInstance {
         }
     }
 
+    /**
+     * 发送心跳加锁
+     *
+     */
     public void sendHeartbeatToAllBrokerWithLock() {
         if (this.lockHeartbeat.tryLock()) {
             try {
+                //发送
                 this.sendHeartbeatToAllBroker();
+                //todo 上传FilterClass
                 this.uploadFilterClassSource();
             } catch (final Exception e) {
                 log.error("sendHeartbeatToAllBroker exception", e);

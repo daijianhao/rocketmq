@@ -23,6 +23,9 @@ import org.apache.rocketmq.client.exception.MQClientException;
 
 /**
  * Push consumer
+ *
+ * 推动式消费（Push Consumer）
+ * Consumer消费的一种类型，该模式下Broker收到数据后会主动推送给消费端，该消费模式一般实时性较高
  */
 public interface MQPushConsumer extends MQConsumer {
     /**

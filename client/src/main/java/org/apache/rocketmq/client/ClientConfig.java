@@ -34,6 +34,9 @@ import org.apache.rocketmq.remoting.protocol.LanguageCode;
  */
 public class ClientConfig {
     public static final String SEND_MESSAGE_WITH_VIP_CHANNEL_PROPERTY = "com.rocketmq.sendMessageWithVIPChannel";
+    /**
+     * 名称服务地址
+     */
     private String namesrvAddr = NameServerAddressUtils.getNameServerAddresses();
     private String clientIP = RemotingUtil.getLocalAddress();
     private String instanceName = System.getProperty("rocketmq.client.name", "DEFAULT");
@@ -56,6 +59,9 @@ public class ClientConfig {
      * Offset persistent interval for consumer
      */
     private int persistConsumerOffsetInterval = 1000 * 5;
+    /**
+     * 当出现异常时的拉取延时
+     */
     private long pullTimeDelayMillsWhenException = 1000;
     private boolean unitMode = false;
     /**
@@ -279,6 +285,9 @@ public class ClientConfig {
         this.language = language;
     }
 
+    /**
+     * 获取名称空间
+     */
     public String getNamespace() {
         if (StringUtils.isNotEmpty(namespace)) {
             return namespace;

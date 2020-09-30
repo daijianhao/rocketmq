@@ -48,6 +48,9 @@ public class ProcessQueue {
     private final TreeMap<Long, MessageExt> msgTreeMap = new TreeMap<Long, MessageExt>();
     private final AtomicLong msgCount = new AtomicLong();
     private final AtomicLong msgSize = new AtomicLong();
+    /**
+     * 可重入锁
+     */
     private final Lock lockConsume = new ReentrantLock();
     /**
      * A subset of msgTreeMap, will only be used when orderly consume
@@ -99,7 +102,7 @@ public class ProcessQueue {
             }
 
             try {
-
+                //将消息回发
                 pushConsumer.sendMessageBack(msg, 3);
                 log.info("send expire msg back. topic={}, msgId={}, storeHost={}, queueId={}, queueOffset={}", msg.getTopic(), msg.getMsgId(), msg.getStoreHost(), msg.getQueueId(), msg.getQueueOffset());
                 try {
@@ -131,13 +134,18 @@ public class ProcessQueue {
             try {
                 int validMsgCnt = 0;
                 for (MessageExt msg : msgs) {
+                    //将拉取到的消息放入本地处理队列中，偏移量为key
                     MessageExt old = msgTreeMap.put(msg.getQueueOffset(), msg);
                     if (null == old) {
+                        //增加有效的消息数
                         validMsgCnt++;
+                        //设置处理队列的最大偏移量
                         this.queueOffsetMax = msg.getQueueOffset();
+                        //增加消息大小
                         msgSize.addAndGet(msg.getBody().length);
                     }
                 }
+                //增加消息总数
                 msgCount.addAndGet(validMsgCnt);
 
                 if (!msgTreeMap.isEmpty() && !this.consuming) {
@@ -146,9 +154,12 @@ public class ProcessQueue {
                 }
 
                 if (!msgs.isEmpty()) {
+                    //获取最后一个消息
                     MessageExt messageExt = msgs.get(msgs.size() - 1);
+                    //获取最大偏移
                     String property = messageExt.getProperty(MessageConst.PROPERTY_MAX_OFFSET);
                     if (property != null) {
+                        //todo 远程队列中已有的最大偏移量减去本次拉取到的最大偏移量？ 没懂
                         long accTotal = Long.parseLong(property) - messageExt.getQueueOffset();
                         if (accTotal > 0) {
                             this.msgAccCnt = accTotal;
@@ -247,6 +258,7 @@ public class ProcessQueue {
         try {
             this.lockTreeMap.writeLock().lockInterruptibly();
             try {
+                //重新放入
                 this.msgTreeMap.putAll(this.consumingMsgOrderlyTreeMap);
                 this.consumingMsgOrderlyTreeMap.clear();
             } finally {
@@ -262,12 +274,16 @@ public class ProcessQueue {
             this.lockTreeMap.writeLock().lockInterruptibly();
             try {
                 Long offset = this.consumingMsgOrderlyTreeMap.lastKey();
+                //减去消费了的消息数
                 msgCount.addAndGet(0 - this.consumingMsgOrderlyTreeMap.size());
                 for (MessageExt msg : this.consumingMsgOrderlyTreeMap.values()) {
+                    //减去消费了的小的大小
                     msgSize.addAndGet(0 - msg.getBody().length);
                 }
+                //清空
                 this.consumingMsgOrderlyTreeMap.clear();
                 if (offset != null) {
+                    //todo offset+1表示下次消费位置
                     return offset + 1;
                 }
             } finally {
@@ -308,6 +324,7 @@ public class ProcessQueue {
                         Map.Entry<Long, MessageExt> entry = this.msgTreeMap.pollFirstEntry();
                         if (entry != null) {
                             result.add(entry.getValue());
+                            //临时存储，在处理消费结果时会用到
                             consumingMsgOrderlyTreeMap.put(entry.getKey(), entry.getValue());
                         } else {
                             break;

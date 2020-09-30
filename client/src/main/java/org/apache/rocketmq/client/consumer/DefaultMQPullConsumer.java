@@ -311,6 +311,9 @@ public class DefaultMQPullConsumer extends ClientConfig implements MQPullConsume
         }
     }
 
+    /**
+     * 主动拉取消息
+     */
     @Override
     public PullResult pull(MessageQueue mq, String subExpression, long offset, int maxNums)
         throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
@@ -375,6 +378,9 @@ public class DefaultMQPullConsumer extends ClientConfig implements MQPullConsume
         this.defaultMQPullConsumerImpl.pullBlockIfNotFound(queueWithNamespace(mq), subExpression, offset, maxNums, pullCallback);
     }
 
+    /**
+     * 提交offset
+     */
     @Override
     public void updateConsumeOffset(MessageQueue mq, long offset) throws MQClientException {
         this.defaultMQPullConsumerImpl.updateConsumeOffset(queueWithNamespace(mq), offset);

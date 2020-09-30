@@ -66,6 +66,8 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
 
     /**
      * Internal implementation. Most of the functions herein are delegated to it.
+     *
+     * 委托DefaultMQPushConsumerImpl来实现具体逻辑
      */
     protected final transient DefaultMQPushConsumerImpl defaultMQPushConsumerImpl;
 
@@ -75,6 +77,12 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
      * </p>
      *
      * See <a href="http://rocketmq.apache.org/docs/core-concept/">here</a> for further discussion.
+     *
+     *
+     * 同一类Consumer的集合，这类Consumer通常消费同一类消息且消费逻辑一致。
+     * 消费者组使得在消息消费方面，实现负载均衡和容错的目标变得非常容易。
+     * 要注意的是，消费者组的消费者实例必须订阅完全相同的Topic。
+     * RocketMQ 支持两种消息模式：集群消费（Clustering）和广播消费（Broadcasting）
      */
     private String consumerGroup;
 
@@ -122,6 +130,10 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
      * messages born prior to {@link #consumeTimestamp} will be ignored
      * </li>
      * </ul>
+     *
+     * 消费起始位置的偏移量
+     *
+     * todo 这个变量只有一个，如何支持同时消费多个topic呢
      */
     private ConsumeFromWhere consumeFromWhere = ConsumeFromWhere.CONSUME_FROM_LAST_OFFSET;
 
@@ -130,6 +142,9 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
      * 20131223171201<br>
      * Implying Seventeen twelve and 01 seconds on December 23, 2013 year<br>
      * Default backtracking consumption time Half an hour ago.
+     *
+     * todo 回溯消费时间戳，作用暂时不清楚
+     * todo 好像是给trace的时候用的
      */
     private String consumeTimestamp = UtilAll.timeMillisToHumanString3(System.currentTimeMillis() - (1000 * 60 * 30));
 
@@ -140,6 +155,8 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
 
     /**
      * Subscription relationship
+     *
+     * 订阅关系
      */
     private Map<String /* topic */, String /* sub expression */> subscription = new HashMap<String, String>();
 
@@ -170,12 +187,15 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
 
     /**
      * Concurrently max span offset.it has no effect on sequential consumption
+     * todo 最大并发消费偏移量
      */
     private int consumeConcurrentlyMaxSpan = 2000;
 
     /**
      * Flow control threshold on queue level, each message queue will cache at most 1000 messages by default,
      * Consider the {@code pullBatchSize}, the instantaneous value may exceed the limit
+     *
+     * todo 队列级别的流控
      */
     private int pullThresholdForQueue = 1000;
 
@@ -196,6 +216,8 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
      * <p>
      * For example, if the value of pullThresholdForTopic is 1000 and 10 message queues are assigned to this consumer,
      * then pullThresholdForQueue will be set to 100
+     *
+     * todo topic级别的流控
      */
     private int pullThresholdForTopic = -1;
 
@@ -207,21 +229,29 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
      * <p>
      * For example, if the value of pullThresholdSizeForTopic is 1000 MiB and 10 message queues are
      * assigned to this consumer, then pullThresholdSizeForQueue will be set to 100 MiB
+     *
+     * todo topic级别流控
      */
     private int pullThresholdSizeForTopic = -1;
 
     /**
      * Message pull Interval
+     *
+     * 拉取间隔
      */
     private long pullInterval = 0;
 
     /**
      * Batch consumption size
+     *
+     * 批量消息最大size
      */
     private int consumeMessageBatchMaxSize = 1;
 
     /**
      * Batch pull size
+     *
+     * 批量拉取最大批量size
      */
     private int pullBatchSize = 32;
 
@@ -241,6 +271,8 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
      *
      * If messages are re-consumed more than {@link #maxReconsumeTimes} before success, it's be directed to a deletion
      * queue waiting.
+     *
+     *
      */
     private int maxReconsumeTimes = -1;
 
@@ -336,6 +368,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
         this.consumerGroup = consumerGroup;
         this.namespace = namespace;
         this.allocateMessageQueueStrategy = allocateMessageQueueStrategy;
+        //与producer类似，真实逻辑由DefaultMQPushConsumerImpl来实现
         defaultMQPushConsumerImpl = new DefaultMQPushConsumerImpl(this, rpcHook);
     }
 
@@ -694,10 +727,13 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
      */
     @Override
     public void start() throws MQClientException {
+        //给消费组添加namespace
         setConsumerGroup(NamespaceUtil.wrapNamespace(this.getNamespace(), this.consumerGroup));
+        //启动
         this.defaultMQPushConsumerImpl.start();
         if (null != traceDispatcher) {
             try {
+                //启动消息轨迹追踪，在消息发送的时候通过回调将发送记录加入到trace的阻塞队列里，然后异步记录发送记录
                 traceDispatcher.start(this.getNamesrvAddr(), this.getAccessChannel());
             } catch (MQClientException e) {
                 log.warn("trace dispatcher start failed ", e);
@@ -747,14 +783,16 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
 
     /**
      * Subscribe a topic to consuming subscription.
+     * 订阅一个topic，重复调用，应该是可以订阅多个topic
      *
      * @param topic topic to subscribe.
      * @param subExpression subscription expression.it only support or operation such as "tag1 || tag2 || tag3" <br>
-     * if null or * expression,meaning subscribe all
+     * if null or * expression,meaning subscribe all 用来过滤一些tag等
      * @throws MQClientException if there is any client error.
      */
     @Override
     public void subscribe(String topic, String subExpression) throws MQClientException {
+        //创建订阅信息
         this.defaultMQPushConsumerImpl.subscribe(withNamespace(topic), subExpression);
     }
 

@@ -37,6 +37,9 @@ import org.apache.rocketmq.remoting.exception.RemotingException;
 
 /**
  * Local storage implementation
+ *
+ * 本地存储的offset实现类，适用于广播消费模式
+ *
  */
 public class LocalFileOffsetStore implements OffsetStore {
     public final static String LOCAL_OFFSET_STORE_DIR = System.getProperty(
@@ -60,12 +63,15 @@ public class LocalFileOffsetStore implements OffsetStore {
 
     @Override
     public void load() throws MQClientException {
+        //从本地文件加载offset
         OffsetSerializeWrapper offsetSerializeWrapper = this.readLocalOffset();
         if (offsetSerializeWrapper != null && offsetSerializeWrapper.getOffsetTable() != null) {
+            //放入
             offsetTable.putAll(offsetSerializeWrapper.getOffsetTable());
 
             for (MessageQueue mq : offsetSerializeWrapper.getOffsetTable().keySet()) {
                 AtomicLong offset = offsetSerializeWrapper.getOffsetTable().get(mq);
+                //打印offset
                 log.info("load consumer's offset, {} {} {}",
                     this.groupName,
                     mq,
@@ -183,15 +189,18 @@ public class LocalFileOffsetStore implements OffsetStore {
     private OffsetSerializeWrapper readLocalOffset() throws MQClientException {
         String content = null;
         try {
+            //尝试从存储路径加载
             content = MixAll.file2String(this.storePath);
         } catch (IOException e) {
             log.warn("Load local offset store file exception", e);
         }
         if (null == content || content.length() == 0) {
+            //失败了就从备份文件加载
             return this.readLocalOffsetBak();
         } else {
             OffsetSerializeWrapper offsetSerializeWrapper = null;
             try {
+                //加载成功则转为对象
                 offsetSerializeWrapper =
                     OffsetSerializeWrapper.fromJson(content, OffsetSerializeWrapper.class);
             } catch (Exception e) {

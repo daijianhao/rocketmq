@@ -67,13 +67,17 @@ public class PullAPIWrapper {
         this.unitMode = unitMode;
     }
 
+    /**
+     * 处理消息拉取结果
+     */
     public PullResult processPullResult(final MessageQueue mq, final PullResult pullResult,
         final SubscriptionData subscriptionData) {
         PullResultExt pullResultExt = (PullResultExt) pullResult;
 
         this.updatePullFromWhichNode(mq, pullResultExt.getSuggestWhichBrokerId());
-        if (PullStatus.FOUND == pullResult.getPullStatus()) {
+        if (PullStatus.FOUND == pullResult.getPullStatus()) {//如果拉取到了
             ByteBuffer byteBuffer = ByteBuffer.wrap(pullResultExt.getMessageBinary());
+            //解码消息
             List<MessageExt> msgList = MessageDecoder.decodes(byteBuffer);
 
             List<MessageExt> msgListFilterAgain = msgList;
@@ -82,22 +86,25 @@ public class PullAPIWrapper {
                 for (MessageExt msg : msgList) {
                     if (msg.getTags() != null) {
                         if (subscriptionData.getTagsSet().contains(msg.getTags())) {
+                            //执行自定义的tag过滤
                             msgListFilterAgain.add(msg);
                         }
                     }
                 }
             }
-
+            //如果存在回调
             if (this.hasHook()) {
                 FilterMessageContext filterMessageContext = new FilterMessageContext();
                 filterMessageContext.setUnitMode(unitMode);
                 filterMessageContext.setMsgList(msgListFilterAgain);
+                //执行过滤后的回调
                 this.executeHook(filterMessageContext);
             }
 
             for (MessageExt msg : msgListFilterAgain) {
                 String traFlag = msg.getProperty(MessageConst.PROPERTY_TRANSACTION_PREPARED);
                 if (Boolean.parseBoolean(traFlag)) {
+                    //设置事务的ID
                     msg.setTransactionId(msg.getProperty(MessageConst.PROPERTY_UNIQ_CLIENT_MESSAGE_ID_KEYIDX));
                 }
                 MessageAccessor.putProperty(msg, MessageConst.PROPERTY_MIN_OFFSET,
