@@ -377,9 +377,12 @@ public class ConsumeQueue {
     }
 
     public void putMessagePositionInfoWrapper(DispatchRequest request) {
+        //最大重试次数
         final int maxRetries = 30;
+        //CQ 是否可写
         boolean canWrite = this.defaultMessageStore.getRunningFlags().isCQWriteable();
         for (int i = 0; i < maxRetries && canWrite; i++) {
+            //tagsCode与延时消息有关
             long tagsCode = request.getTagsCode();
             if (isExtWriteEnable()) {
                 ConsumeQueueExt.CqExtUnit cqExtUnit = new ConsumeQueueExt.CqExtUnit();
@@ -585,3 +588,5 @@ public class ConsumeQueue {
         return ConsumeQueueExt.isExtAddr(tagsCode);
     }
 }
+
+
