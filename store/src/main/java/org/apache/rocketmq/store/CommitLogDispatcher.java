@@ -19,6 +19,13 @@ package org.apache.rocketmq.store;
 
 /**
  * Dispatcher of commit log.
+ * <p>
+ * 负责分发CommitLong
+ *
+ * 其有三个实现类，负责在将CommitLog被分发时处理分发请求
+ *
+ * 处理顺序分别是 CommitLogDispatcherCalcBitMap --> CommitLogDispatcherBuildConsumeQueue --> CommitLogDispatcherBuildIndex
+ *
  */
 public interface CommitLogDispatcher {
 

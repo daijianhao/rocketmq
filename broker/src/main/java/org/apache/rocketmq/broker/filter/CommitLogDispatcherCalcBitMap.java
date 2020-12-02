@@ -31,6 +31,11 @@ import java.util.Iterator;
 
 /**
  * Calculate bit map of filter.
+ *
+ * 将消息分发至bit map的分发器实现类
+ *
+ * 本类主要的作用就是将message与 预设的过滤条件进行匹配，通过bloom过滤器计算bitmap，然后设置到DispatchRequest的 bitMap 中，
+ * 供后续ConsumerQueue和 MessageArrivingListener 中过滤时使用
  */
 public class CommitLogDispatcherCalcBitMap implements CommitLogDispatcher {
 
@@ -51,7 +56,7 @@ public class CommitLogDispatcherCalcBitMap implements CommitLogDispatcher {
         }
 
         try {
-
+            //获取当前主题的过滤数据
             Collection<ConsumerFilterData> filterDatas = consumerFilterManager.get(request.getTopic());
 
             if (filterDatas == null || filterDatas.isEmpty()) {
@@ -79,8 +84,9 @@ public class CommitLogDispatcherCalcBitMap implements CommitLogDispatcher {
 
                 Object ret = null;
                 try {
+                    //消息属性评估的上下文
                     MessageEvaluationContext context = new MessageEvaluationContext(request.getPropertiesMap());
-
+                    //进行评估
                     ret = filterData.getCompiledExpression().evaluate(context);
                 } catch (Throwable e) {
                     log.error("Calc filter bit map error!commitLogOffset={}, consumer={}, {}", request.getCommitLogOffset(), filterData, e);
@@ -90,13 +96,14 @@ public class CommitLogDispatcherCalcBitMap implements CommitLogDispatcher {
 
                 // eval true
                 if (ret != null && ret instanceof Boolean && (Boolean) ret) {
+                    //将当前主题的bloom过滤器计算结果设置到filterBitMap中
                     consumerFilterManager.getBloomFilter().hashTo(
-                        filterData.getBloomFilterData(),
+                        filterData.getBloomFilterData(),//当前主题的过滤器数据
                         filterBitMap
                     );
                 }
             }
-
+            //设置消息的bitmap
             request.setBitMap(filterBitMap.bytes());
 
             long elapsedTime = UtilAll.computeElapsedTimeMilliseconds(startTime);

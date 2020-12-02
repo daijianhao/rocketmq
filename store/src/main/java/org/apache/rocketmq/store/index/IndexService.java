@@ -16,6 +16,16 @@
  */
 package org.apache.rocketmq.store.index;
 
+import org.apache.rocketmq.common.UtilAll;
+import org.apache.rocketmq.common.constant.LoggerName;
+import org.apache.rocketmq.common.message.MessageConst;
+import org.apache.rocketmq.common.sysflag.MessageSysFlag;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.logging.InternalLoggerFactory;
+import org.apache.rocketmq.store.DefaultMessageStore;
+import org.apache.rocketmq.store.DispatchRequest;
+import org.apache.rocketmq.store.config.StorePathConfigHelper;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -23,26 +33,29 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import org.apache.rocketmq.common.UtilAll;
-import org.apache.rocketmq.common.constant.LoggerName;
-import org.apache.rocketmq.logging.InternalLogger;
-import org.apache.rocketmq.logging.InternalLoggerFactory;
-import org.apache.rocketmq.common.message.MessageConst;
-import org.apache.rocketmq.common.sysflag.MessageSysFlag;
-import org.apache.rocketmq.store.DefaultMessageStore;
-import org.apache.rocketmq.store.DispatchRequest;
-import org.apache.rocketmq.store.config.StorePathConfigHelper;
 
+/**
+ * 负责处理与IndexFile相关操作的类
+ * <p>
+ * IndexFile：IndexFile（索引文件）提供了一种可以通过key或时间区间来查询消息的方法。Index文件的存储位置是：$HOME \store\index${fileName}，
+ * 文件名fileName是以创建时的时间戳命名的，固定的单个IndexFile文件大小约为400M，一个IndexFile可以保存 2000W个索引，
+ * IndexFile的底层存储设计为在文件系统中实现HashMap结构，故rocketmq的索引文件其底层实现为hash索引。
+ */
 public class IndexService {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
     /**
      * Maximum times to attempt index file creation.
+     * <p>
+     * 创建索引文件的最大重试次数
      */
     private static final int MAX_TRY_IDX_CREATE = 3;
     private final DefaultMessageStore defaultMessageStore;
     private final int hashSlotNum;
     private final int indexNum;
     private final String storePath;
+    /**
+     * 保存IndexFile的链表
+     */
     private final ArrayList<IndexFile> indexFileList = new ArrayList<IndexFile>();
     private final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
 
@@ -51,7 +64,7 @@ public class IndexService {
         this.hashSlotNum = store.getMessageStoreConfig().getMaxHashSlotNum();
         this.indexNum = store.getMessageStoreConfig().getMaxIndexNum();
         this.storePath =
-            StorePathConfigHelper.getStorePathIndex(store.getMessageStoreConfig().getStorePathRootDir());
+                StorePathConfigHelper.getStorePathIndex(store.getMessageStoreConfig().getStorePathRootDir());
     }
 
     public boolean load(final boolean lastExitOK) {
@@ -67,7 +80,7 @@ public class IndexService {
 
                     if (!lastExitOK) {
                         if (f.getEndTimestamp() > this.defaultMessageStore.getStoreCheckpoint()
-                            .getIndexMsgTimestamp()) {
+                                .getIndexMsgTimestamp()) {
                             f.destroy(0);
                             continue;
                         }
@@ -194,32 +207,52 @@ public class IndexService {
         return new QueryOffsetResult(phyOffsets, indexLastUpdateTimestamp, indexLastUpdatePhyoffset);
     }
 
+    /**
+     * 拼接消息Key
+     * @param topic
+     * @param key
+     * @return
+     */
     private String buildKey(final String topic, final String key) {
         return topic + "#" + key;
     }
 
+    /**
+     * 构建消息索引文件
+     * <p>
+     * ReputService将消息CommitLog中新增的Message进行分发时会调用到此处，进而建立索引文件
+     *
+     * 此方法在ReputService的单线程中执行 因此不存线程安全问题
+     * @param req
+     */
     public void buildIndex(DispatchRequest req) {
+        //创建IndexFile
         IndexFile indexFile = retryGetAndCreateIndexFile();
-        if (indexFile != null) {
+        if (indexFile != null) {//创建成功
             long endPhyOffset = indexFile.getEndPhyOffset();
             DispatchRequest msg = req;
             String topic = msg.getTopic();
             String keys = msg.getKeys();
             if (msg.getCommitLogOffset() < endPhyOffset) {
+                //当前消息的偏移量小于indexFile最后一条的偏移量，则返回
                 return;
             }
 
             final int tranType = MessageSysFlag.getTransactionValue(msg.getSysFlag());
+            //判断事务消息类型
             switch (tranType) {
                 case MessageSysFlag.TRANSACTION_NOT_TYPE:
                 case MessageSysFlag.TRANSACTION_PREPARED_TYPE:
                 case MessageSysFlag.TRANSACTION_COMMIT_TYPE:
                     break;
                 case MessageSysFlag.TRANSACTION_ROLLBACK_TYPE:
+                    //回滚消息不存储
                     return;
             }
 
-            if (req.getUniqKey() != null) {
+
+            if (req.getUniqKey() != null) {//唯一的消息ID不为空
+                //将消息放入IndexFile
                 indexFile = putKey(indexFile, msg, buildKey(topic, req.getUniqKey()));
                 if (indexFile == null) {
                     log.error("putKey error commitlog {} uniqkey {}", req.getCommitLogOffset(), req.getUniqKey());
@@ -248,12 +281,12 @@ public class IndexService {
     private IndexFile putKey(IndexFile indexFile, DispatchRequest msg, String idxKey) {
         for (boolean ok = indexFile.putKey(idxKey, msg.getCommitLogOffset(), msg.getStoreTimestamp()); !ok; ) {
             log.warn("Index file [" + indexFile.getFileName() + "] is full, trying to create another one");
-
+            //放入失败，尝试创建indexFile
             indexFile = retryGetAndCreateIndexFile();
             if (null == indexFile) {
                 return null;
             }
-
+            //再试试能不能放进去
             ok = indexFile.putKey(idxKey, msg.getCommitLogOffset(), msg.getStoreTimestamp());
         }
 
@@ -262,12 +295,14 @@ public class IndexService {
 
     /**
      * Retries to get or create index file.
+     * 尝试创建索引文件
      *
      * @return {@link IndexFile} or null on failure.
      */
     public IndexFile retryGetAndCreateIndexFile() {
         IndexFile indexFile = null;
 
+        //循环重试 3 次
         for (int times = 0; null == indexFile && times < MAX_TRY_IDX_CREATE; times++) {
             indexFile = this.getAndCreateLastIndexFile();
             if (null != indexFile)
@@ -289,19 +324,30 @@ public class IndexService {
         return indexFile;
     }
 
+    /**
+     * 创建Index文件
+     */
     public IndexFile getAndCreateLastIndexFile() {
         IndexFile indexFile = null;
+        //上一个Index文件
         IndexFile prevIndexFile = null;
+        //上一个indexFile中的最后一条消息的CommitLog偏移量
         long lastUpdateEndPhyOffset = 0;
+        //上一个indexFile中的最后一条消息的存储时间
         long lastUpdateIndexTimestamp = 0;
 
         {
+            //加读锁
             this.readWriteLock.readLock().lock();
+            //indexFile列表不为空
             if (!this.indexFileList.isEmpty()) {
+                //获取最后一个
                 IndexFile tmp = this.indexFileList.get(this.indexFileList.size() - 1);
                 if (!tmp.isWriteFull()) {
+                    //没写满 赋值
                     indexFile = tmp;
                 } else {
+                    //
                     lastUpdateEndPhyOffset = tmp.getEndPhyOffset();
                     lastUpdateIndexTimestamp = tmp.getEndTimestamp();
                     prevIndexFile = tmp;
@@ -311,15 +357,19 @@ public class IndexService {
             this.readWriteLock.readLock().unlock();
         }
 
+        //没有从当前indexFile中获取到有用的indexFile
         if (indexFile == null) {
             try {
+                //拼接文件名
                 String fileName =
-                    this.storePath + File.separator
-                        + UtilAll.timeMillisToHumanString(System.currentTimeMillis());
+                        this.storePath + File.separator
+                                + UtilAll.timeMillisToHumanString(System.currentTimeMillis());
+                //创建IndexFile
                 indexFile =
-                    new IndexFile(fileName, this.hashSlotNum, this.indexNum, lastUpdateEndPhyOffset,
-                        lastUpdateIndexTimestamp);
+                        new IndexFile(fileName, this.hashSlotNum, this.indexNum, lastUpdateEndPhyOffset,
+                                lastUpdateIndexTimestamp);
                 this.readWriteLock.writeLock().lock();
+                //加入到IndexList
                 this.indexFileList.add(indexFile);
             } catch (Exception e) {
                 log.error("getLastIndexFile exception ", e);
@@ -328,6 +378,7 @@ public class IndexService {
             }
 
             if (indexFile != null) {
+                //创建了新的IndexFile 将上一个flush
                 final IndexFile flushThisFile = prevIndexFile;
                 Thread flushThread = new Thread(new Runnable() {
                     @Override
@@ -340,10 +391,13 @@ public class IndexService {
                 flushThread.start();
             }
         }
-
+        //返回Index
         return indexFile;
     }
 
+    /**
+     * 将IndexFile刷盘
+     */
     public void flush(final IndexFile f) {
         if (null == f)
             return;
@@ -354,10 +408,12 @@ public class IndexService {
             indexMsgTimestamp = f.getEndTimestamp();
         }
 
+        //刷盘
         f.flush();
-
+        //保存最后一条记录的存储时间
         if (indexMsgTimestamp > 0) {
             this.defaultMessageStore.getStoreCheckpoint().setIndexMsgTimestamp(indexMsgTimestamp);
+            //将保存点也刷盘
             this.defaultMessageStore.getStoreCheckpoint().flush();
         }
     }

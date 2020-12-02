@@ -1740,6 +1740,9 @@ public class MQClientAPIImpl {
         throw new MQClientException(response.getCode(), response.getRemark());
     }
 
+    /**
+     * 注册过滤器类
+     */
     public void registerMessageFilterClass(final String addr,
         final String consumerGroup,
         final String topic,
@@ -1753,9 +1756,10 @@ public class MQClientAPIImpl {
         requestHeader.setClassName(className);
         requestHeader.setTopic(topic);
         requestHeader.setClassCRC(classCRC);
-
+        //创建请求
         RemotingCommand request = RemotingCommand.createRequestCommand(RequestCode.REGISTER_MESSAGE_FILTER_CLASS, requestHeader);
         request.setBody(classBody);
+        //发送请求，将过滤器类的源码上传到服务器
         RemotingCommand response = this.remotingClient.invokeSync(addr, request, timeoutMillis);
         switch (response.getCode()) {
             case ResponseCode.SUCCESS: {

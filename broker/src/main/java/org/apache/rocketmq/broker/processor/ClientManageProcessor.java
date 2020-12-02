@@ -72,8 +72,12 @@ public class ClientManageProcessor extends AsyncNettyRequestProcessor implements
         return false;
     }
 
+    /**
+     * 处理心跳
+     */
     public RemotingCommand heartBeat(ChannelHandlerContext ctx, RemotingCommand request) {
         RemotingCommand response = RemotingCommand.createResponseCommand(null);
+        //解码心跳包
         HeartbeatData heartbeatData = HeartbeatData.decode(request.getBody(), HeartbeatData.class);
         ClientChannelInfo clientChannelInfo = new ClientChannelInfo(
             ctx.channel(),
@@ -106,7 +110,7 @@ public class ClientManageProcessor extends AsyncNettyRequestProcessor implements
                 data.getConsumeType(),
                 data.getMessageModel(),
                 data.getConsumeFromWhere(),
-                data.getSubscriptionDataSet(),
+                data.getSubscriptionDataSet(),//消费者子订阅数据
                 isNotifyConsumerIdsChangedEnable
             );
 

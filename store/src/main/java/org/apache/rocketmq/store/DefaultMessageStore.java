@@ -1380,8 +1380,9 @@ public class DefaultMessageStore implements MessageStore {
 
     /**
      * 加载ConsumerQueue
-     *
+     * <p>
      * todo
+     *
      * @return
      */
     private boolean loadConsumeQueue() {
@@ -1514,7 +1515,7 @@ public class DefaultMessageStore implements MessageStore {
 
     /**
      * 将消息分发到ConsumerQueue中
-     *
+     * <p>
      * 消息相关信息都在DispatchRequest中
      */
     public void doDispatch(DispatchRequest req) {
@@ -1526,6 +1527,7 @@ public class DefaultMessageStore implements MessageStore {
 
     /**
      * 实现消息分发
+     *
      * @param dispatchRequest
      */
     public void putMessagePositionInfo(DispatchRequest dispatchRequest) {
@@ -1585,7 +1587,7 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     /**
-     * 将消息分发到ConsumerQueue的实现类
+     * 将消息分发到ConsumerQueue的分发器实现类
      */
     class CommitLogDispatcherBuildConsumeQueue implements CommitLogDispatcher {
 
@@ -1605,11 +1607,16 @@ public class DefaultMessageStore implements MessageStore {
         }
     }
 
+    /**
+     * 将消息分发到IndexService的分发器实现类
+     */
     class CommitLogDispatcherBuildIndex implements CommitLogDispatcher {
 
         @Override
         public void dispatch(DispatchRequest request) {
+            //如果开启了消息索引
             if (DefaultMessageStore.this.messageStoreConfig.isMessageIndexEnable()) {
+                //构建消息索引
                 DefaultMessageStore.this.indexService.buildIndex(request);
             }
         }
@@ -1985,11 +1992,13 @@ public class DefaultMessageStore implements MessageStore {
                             //判断是否成功，即消息解析后校验是否通过
                             if (dispatchRequest.isSuccess()) {
                                 if (size > 0) {
-                                    //进行消息的分发
+                                    //进行消息的分发（包括 计算bloom过滤的bitmap 、构建ConsumerQueue文件、构建Index文件）
                                     DefaultMessageStore.this.doDispatch(dispatchRequest);
 
                                     if (BrokerRole.SLAVE != DefaultMessageStore.this.getMessageStoreConfig().getBrokerRole()
                                             && DefaultMessageStore.this.brokerConfig.isLongPollingEnable()) {
+                                        //如果不是slave并且开启的长轮询，触发消息到来的监听器，这里主要是通知PullRequestHoldService,主动调用一次检查Consumer的pullRequest的过程
+                                        //使Consumer能及时拉取到消息
                                         DefaultMessageStore.this.messageArrivingListener.arriving(dispatchRequest.getTopic(),
                                                 dispatchRequest.getQueueId(), dispatchRequest.getConsumeQueueOffset() + 1,
                                                 dispatchRequest.getTagsCode(), dispatchRequest.getStoreTimestamp(),

@@ -35,6 +35,8 @@ import java.util.List;
  * <li>2. And is week reliable.</li>
  * <li>3. Be careful, address returned is always less than 0.</li>
  * <li>4. Pls keep this file small.</li>
+ *
+ * CQ扩展，用来存储一些不重要的信息，
  */
 public class ConsumeQueueExt {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
@@ -76,10 +78,11 @@ public class ConsumeQueueExt {
         this.topic = topic;
         this.queueId = queueId;
 
+        //home + consumequeue_ext + topic + queueId
         String queueDir = this.storePath
             + File.separator + topic
             + File.separator + queueId;
-
+        //映射ConsumerQueueExt存储文件
         this.mappedFileQueue = new MappedFileQueue(queueDir, mappedFileSize, null);
 
         if (bitMapLength > 0) {
@@ -184,12 +187,16 @@ public class ConsumeQueueExt {
      * Be careful, this method is not thread safe.
      * </p>
      *
+     * 将CQ ExtUnit 存入
+     *
      * @return success: < 0: fail: >=0
      */
     public long put(final CqExtUnit cqExtUnit) {
         final int retryTimes = 3;
         try {
+            //总大小
             int size = cqExtUnit.calcUnitSize();
+            //超过最大大小，打印错误日志
             if (size > CqExtUnit.MAX_EXT_UNIT_SIZE) {
                 log.error("Size of cq ext unit is greater than {}, {}", CqExtUnit.MAX_EXT_UNIT_SIZE, cqExtUnit);
                 return 1;
@@ -207,6 +214,7 @@ public class ConsumeQueueExt {
                 MappedFile mappedFile = this.mappedFileQueue.getLastMappedFile();
 
                 if (mappedFile == null || mappedFile.isFull()) {
+                    //没有会主动创建
                     mappedFile = this.mappedFileQueue.getLastMappedFile(0);
                 }
 
@@ -406,6 +414,8 @@ public class ConsumeQueueExt {
 
     /**
      * Store unit.
+     *
+     * 存储单元
      */
     public static class CqExtUnit {
         public static final short MIN_EXT_UNIT_SIZE
@@ -428,6 +438,8 @@ public class ConsumeQueueExt {
 
         /**
          * unit size
+         *
+         * 单元大小
          */
         private short size;
         /**

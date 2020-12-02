@@ -28,17 +28,46 @@ import java.util.Collections;
 
 /**
  * Filter data of consumer.
+ *
+ * 消费者过滤器数据
  */
 public class ConsumerFilterData {
 
+    /**
+     * 消费组
+     */
     private String consumerGroup;
+    /**
+     * 主题
+     */
     private String topic;
+    /**
+     * 表达式
+     */
     private String expression;
+    /**
+     * 表达式类型
+     */
     private String expressionType;
+    /**
+     * 编译后的表达式
+     */
     private transient Expression compiledExpression;
+    /**
+     * 产生时间
+     */
     private long bornTime;
+    /**
+     * 死亡时间
+     */
     private long deadTime = 0;
+    /**
+     * bloom过滤器数据
+     */
     private BloomFilterData bloomFilterData;
+    /**
+     * 客户端版本
+     */
     private long clientVersion;
 
     public boolean isDead() {

@@ -46,8 +46,11 @@ public class FilterAPI {
      */
     public static SubscriptionData buildSubscriptionData(final String consumerGroup, String topic,
         String subString) throws Exception {
+        //创建子订阅数据
         SubscriptionData subscriptionData = new SubscriptionData();
+        //设置主题
         subscriptionData.setTopic(topic);
+        //设置过滤子串
         subscriptionData.setSubString(subString);
 
         if (null == subString || subString.equals(SubscriptionData.SUB_ALL) || subString.length() == 0) {

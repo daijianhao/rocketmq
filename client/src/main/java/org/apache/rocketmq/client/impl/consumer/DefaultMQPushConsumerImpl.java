@@ -1001,6 +1001,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
 
     public void subscribe(String topic, String subExpression) throws MQClientException {
         try {
+            //创建子订阅信息，主要是针对有自定义的TAG 过滤的情况
             SubscriptionData subscriptionData = FilterAPI.buildSubscriptionData(this.defaultMQPushConsumer.getConsumerGroup(),
                     topic, subExpression);
             //将订阅信息放入rebalance中

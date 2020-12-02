@@ -40,6 +40,8 @@ public class BloomFilter {
     /**
      * Create bloom filter by error rate and mapping num.
      *
+     * 创建bloom过滤器
+     *
      * @param f error rate
      * @param n num will mapping to bit
      */
@@ -85,6 +87,8 @@ public class BloomFilter {
      * <p>
      * See "Less Hashing, Same Performance: Building a Better Bloom Filter" by Adam Kirsch and Michael
      * Mitzenmacher.
+     *
+     * 计算bitmap
      * </p>
      */
     public int[] calcBitPositions(String str) {

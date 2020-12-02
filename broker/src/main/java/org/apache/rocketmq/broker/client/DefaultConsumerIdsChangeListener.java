@@ -24,6 +24,9 @@ import java.util.List;
 import org.apache.rocketmq.broker.BrokerController;
 import org.apache.rocketmq.common.protocol.heartbeat.SubscriptionData;
 
+/**
+ * 监听消费者ID变化
+ */
 public class DefaultConsumerIdsChangeListener implements ConsumerIdsChangeListener {
     private final BrokerController brokerController;
 
@@ -55,6 +58,7 @@ public class DefaultConsumerIdsChangeListener implements ConsumerIdsChangeListen
                 if (args == null || args.length < 1) {
                     return;
                 }
+                //注册子订阅的过滤器到过滤器过管理器中
                 Collection<SubscriptionData> subscriptionDataList = (Collection<SubscriptionData>) args[0];
                 this.brokerController.getConsumerFilterManager().register(group, subscriptionDataList);
                 break;

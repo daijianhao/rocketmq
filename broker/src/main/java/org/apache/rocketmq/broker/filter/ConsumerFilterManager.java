@@ -59,6 +59,7 @@ public class ConsumerFilterManager extends ConfigManager {
 
     public ConsumerFilterManager(BrokerController brokerController) {
         this.brokerController = brokerController;
+        //创建Bloom过滤器
         this.bloomFilter = BloomFilter.createByFn(
             brokerController.getBrokerConfig().getMaxErrorRateOfBloomFilter(),
             brokerController.getBrokerConfig().getExpectConsumerNumUseFilter()
@@ -101,6 +102,9 @@ public class ConsumerFilterManager extends ConfigManager {
         return consumerFilterData;
     }
 
+    /**
+     * 注册子订阅信息
+     */
     public void register(final String consumerGroup, final Collection<SubscriptionData> subList) {
         for (SubscriptionData subscriptionData : subList) {
             register(
@@ -134,8 +138,12 @@ public class ConsumerFilterManager extends ConfigManager {
         }
     }
 
+    /**
+     * 注册过滤器
+     */
     public boolean register(final String topic, final String consumerGroup, final String expression,
         final String type, final long clientVersion) {
+        //如果是TAG过滤则返回
         if (ExpressionType.isTagType(type)) {
             return false;
         }
@@ -147,13 +155,18 @@ public class ConsumerFilterManager extends ConfigManager {
         FilterDataMapByTopic filterDataMapByTopic = this.filterDataByTopic.get(topic);
 
         if (filterDataMapByTopic == null) {
+            //注册一个临时的过滤器数据
             FilterDataMapByTopic temp = new FilterDataMapByTopic(topic);
+            //放入map中
             FilterDataMapByTopic prev = this.filterDataByTopic.putIfAbsent(topic, temp);
             filterDataMapByTopic = prev != null ? prev : temp;
         }
-
+        //计算 consumerGroup+"#"+topic 的bloom过滤器值
         BloomFilterData bloomFilterData = bloomFilter.generate(consumerGroup + "#" + topic);
 
+        /**
+         * 注册不同主题的bloom过滤值
+         */
         return filterDataMapByTopic.register(consumerGroup, expression, type, bloomFilterData, clientVersion);
     }
 
@@ -357,12 +370,15 @@ public class ConsumerFilterManager extends ConfigManager {
             ConsumerFilterData old = this.groupFilterData.get(consumerGroup);
 
             if (old == null) {
+                //创建过滤信息
                 ConsumerFilterData consumerFilterData = build(topic, consumerGroup, expression, type, clientVersion);
                 if (consumerFilterData == null) {
                     return false;
                 }
+                //设置bloom过滤数据
                 consumerFilterData.setBloomFilterData(bloomFilterData);
 
+                //替换原来的
                 old = this.groupFilterData.putIfAbsent(consumerGroup, consumerFilterData);
                 if (old == null) {
                     log.info("New consumer filter registered: {}", consumerFilterData);
