@@ -612,9 +612,12 @@ public class BrokerController {
 
         /**
          * Default
+         * 创立处理Admin请求相关的Processor
          */
         AdminBrokerProcessor adminProcessor = new AdminBrokerProcessor(this);
+        //注册到Server的Processor中
         this.remotingServer.registerDefaultProcessor(adminProcessor, this.adminBrokerExecutor);
+        //注册到Server的Processor中，VIP通道
         this.fastRemotingServer.registerDefaultProcessor(adminProcessor, this.adminBrokerExecutor);
     }
 
@@ -916,8 +919,13 @@ public class BrokerController {
 
     }
 
+    /**
+     * 将broker的topic信息更新到NameServer
+     *
+     */
     public synchronized void registerIncrementBrokerData(TopicConfig topicConfig, DataVersion dataVersion) {
         TopicConfig registerTopicConfig = topicConfig;
+        //如果当前broker不可写或不可读，就把当前broker的权限复制给topic
         if (!PermName.isWriteable(this.getBrokerConfig().getBrokerPermission())
                 || !PermName.isReadable(this.getBrokerConfig().getBrokerPermission())) {
             registerTopicConfig =
@@ -926,11 +934,13 @@ public class BrokerController {
         }
 
         ConcurrentMap<String, TopicConfig> topicConfigTable = new ConcurrentHashMap<String, TopicConfig>();
+        //这里只放入了一个
         topicConfigTable.put(topicConfig.getTopicName(), registerTopicConfig);
+        //包装为可序列化的TopicConfig对象
         TopicConfigSerializeWrapper topicConfigSerializeWrapper = new TopicConfigSerializeWrapper();
         topicConfigSerializeWrapper.setDataVersion(dataVersion);
         topicConfigSerializeWrapper.setTopicConfigTable(topicConfigTable);
-
+        //真正的注册
         doRegisterBrokerAll(true, false, topicConfigSerializeWrapper);
     }
 
@@ -960,6 +970,7 @@ public class BrokerController {
 
     private void doRegisterBrokerAll(boolean checkOrderConfig, boolean oneway,
                                      TopicConfigSerializeWrapper topicConfigWrapper) {
+        //取得注册结果
         List<RegisterBrokerResult> registerBrokerResultList = this.brokerOuterAPI.registerBrokerAll(
                 this.brokerConfig.getBrokerClusterName(),
                 this.getBrokerAddr(),
@@ -973,14 +984,16 @@ public class BrokerController {
                 this.brokerConfig.isCompressedRegister());
 
         if (registerBrokerResultList.size() > 0) {
+            //获取第一个结果
             RegisterBrokerResult registerBrokerResult = registerBrokerResultList.get(0);
             if (registerBrokerResult != null) {
                 if (this.updateMasterHAServerAddrPeriodically && registerBrokerResult.getHaServerAddr() != null) {
+                    //如果开启了按时更新HAServerAddr，这里更新下HaServer地址
                     this.messageStore.updateHaMasterAddress(registerBrokerResult.getHaServerAddr());
                 }
-
+                //设置Master地址
                 this.slaveSynchronize.setMasterAddr(registerBrokerResult.getMasterAddr());
-
+                //检查
                 if (checkOrderConfig) {
                     this.getTopicConfigManager().updateOrderTopicConfig(registerBrokerResult.getKvTable());
                 }

@@ -138,6 +138,9 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 
+/**
+ * 处理管理相关想请求的Processor
+ */
 public class AdminBrokerProcessor extends AsyncNettyRequestProcessor implements NettyRequestProcessor {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     private final BrokerController brokerController;
@@ -149,14 +152,15 @@ public class AdminBrokerProcessor extends AsyncNettyRequestProcessor implements 
     @Override
     public RemotingCommand processRequest(ChannelHandlerContext ctx,
         RemotingCommand request) throws RemotingCommandException {
+        //判断是何种类型的request
         switch (request.getCode()) {
-            case RequestCode.UPDATE_AND_CREATE_TOPIC:
+            case RequestCode.UPDATE_AND_CREATE_TOPIC://更新并创建topic
                 return this.updateAndCreateTopic(ctx, request);
-            case RequestCode.DELETE_TOPIC_IN_BROKER:
+            case RequestCode.DELETE_TOPIC_IN_BROKER://删除topic
                 return this.deleteTopic(ctx, request);
-            case RequestCode.GET_ALL_TOPIC_CONFIG:
+            case RequestCode.GET_ALL_TOPIC_CONFIG://获取所有topicConfig
                 return this.getAllTopicConfig(ctx, request);
-            case RequestCode.UPDATE_BROKER_CONFIG:
+            case RequestCode.UPDATE_BROKER_CONFIG://更新broker配置
                 return this.updateBrokerConfig(ctx, request);
             case RequestCode.GET_BROKER_CONFIG:
                 return this.getBrokerConfig(ctx, request);
@@ -246,22 +250,30 @@ public class AdminBrokerProcessor extends AsyncNettyRequestProcessor implements 
         return false;
     }
 
+    /**
+     * 更新并创建topic
+     */
     private synchronized RemotingCommand updateAndCreateTopic(ChannelHandlerContext ctx,
         RemotingCommand request) throws RemotingCommandException {
+        //先创建响应对象
         final RemotingCommand response = RemotingCommand.createResponseCommand(null);
+        //解析请求体
         final CreateTopicRequestHeader requestHeader =
             (CreateTopicRequestHeader) request.decodeCommandCustomHeader(CreateTopicRequestHeader.class);
         log.info("updateAndCreateTopic called by {}", RemotingHelper.parseChannelRemoteAddr(ctx.channel()));
-
+        //topic名称
         String topic = requestHeader.getTopic();
 
+        //验证topic是否合法
         if (!TopicValidator.validateTopic(topic, response)) {
             return response;
         }
+        //验证是否是系统topic
         if (TopicValidator.isSystemTopic(topic, response)) {
             return response;
         }
 
+        //创建topicConfig对象
         TopicConfig topicConfig = new TopicConfig(topic);
         topicConfig.setReadQueueNums(requestHeader.getReadQueueNums());
         topicConfig.setWriteQueueNums(requestHeader.getWriteQueueNums());
@@ -269,8 +281,9 @@ public class AdminBrokerProcessor extends AsyncNettyRequestProcessor implements 
         topicConfig.setPerm(requestHeader.getPerm());
         topicConfig.setTopicSysFlag(requestHeader.getTopicSysFlag() == null ? 0 : requestHeader.getTopicSysFlag());
 
+        //利用TopicConfigManager来更新topic信息，不存在则创建，存在则更新，并且持久化到文件中
         this.brokerController.getTopicConfigManager().updateTopicConfig(topicConfig);
-
+        //broker将topic信息同步到nameserv
         this.brokerController.registerIncrementBrokerData(topicConfig, this.brokerController.getTopicConfigManager().getDataVersion());
 
         response.setCode(ResponseCode.SUCCESS);

@@ -111,6 +111,20 @@ public class BrokerOuterAPI {
         this.remotingClient.updateNameServerAddressList(lst);
     }
 
+    /**
+     * 将Topic注册到NameServer
+     * @param clusterName 当前broker所在集群
+     * @param brokerAddr 当前broker地址
+     * @param brokerName 当前broker名称
+     * @param brokerId 当前brokerId
+     * @param haServerAddr 高可用Server地址
+     * @param topicConfigWrapper Topic信息
+     * @param filterServerList 过滤服务器列表
+     * @param oneway 调用方式oneway
+     * @param timeoutMills 超时时间
+     * @param compressed 是否压缩
+     * @return
+     */
     public List<RegisterBrokerResult> registerBrokerAll(
         final String clusterName,
         final String brokerAddr,
@@ -124,9 +138,11 @@ public class BrokerOuterAPI {
         final boolean compressed) {
 
         final List<RegisterBrokerResult> registerBrokerResultList = Lists.newArrayList();
+        //获取NameServer的地址列表
         List<String> nameServerAddressList = this.remotingClient.getNameServerAddressList();
         if (nameServerAddressList != null && nameServerAddressList.size() > 0) {
 
+            //封装请求头
             final RegisterBrokerRequestHeader requestHeader = new RegisterBrokerRequestHeader();
             requestHeader.setBrokerAddr(brokerAddr);
             requestHeader.setBrokerId(brokerId);
@@ -134,19 +150,23 @@ public class BrokerOuterAPI {
             requestHeader.setClusterName(clusterName);
             requestHeader.setHaServerAddr(haServerAddr);
             requestHeader.setCompressed(compressed);
-
+            //封装请求体
             RegisterBrokerBody requestBody = new RegisterBrokerBody();
             requestBody.setTopicConfigSerializeWrapper(topicConfigWrapper);
             requestBody.setFilterServerList(filterServerList);
+            //编码请求体
             final byte[] body = requestBody.encode(compressed);
+            //CRC32校验
             final int bodyCrc32 = UtilAll.crc32(body);
             requestHeader.setBodyCrc32(bodyCrc32);
             final CountDownLatch countDownLatch = new CountDownLatch(nameServerAddressList.size());
+            //循环NameServer进行注册
             for (final String namesrvAddr : nameServerAddressList) {
                 brokerOuterExecutor.execute(new Runnable() {
                     @Override
                     public void run() {
                         try {
+                            //向NameServer注册
                             RegisterBrokerResult result = registerBroker(namesrvAddr,oneway, timeoutMills,requestHeader,body);
                             if (result != null) {
                                 registerBrokerResultList.add(result);
@@ -156,6 +176,7 @@ public class BrokerOuterAPI {
                         } catch (Exception e) {
                             log.warn("registerBroker Exception, {}", namesrvAddr, e);
                         } finally {
+                            //countDown 等所有NameServer都执行了注册 就继续
                             countDownLatch.countDown();
                         }
                     }
@@ -163,14 +184,18 @@ public class BrokerOuterAPI {
             }
 
             try {
+                //限时等待
                 countDownLatch.await(timeoutMills, TimeUnit.MILLISECONDS);
             } catch (InterruptedException e) {
             }
         }
-
+        //返回注册结果
         return registerBrokerResultList;
     }
 
+    /**
+     * 向NameServer发送注册请求
+     */
     private RegisterBrokerResult registerBroker(
         final String namesrvAddr,
         final boolean oneway,
@@ -184,23 +209,27 @@ public class BrokerOuterAPI {
 
         if (oneway) {
             try {
+                //oneway方式
                 this.remotingClient.invokeOneway(namesrvAddr, request, timeoutMills);
             } catch (RemotingTooMuchRequestException e) {
                 // Ignore
             }
             return null;
         }
-
+        //同步执行
         RemotingCommand response = this.remotingClient.invokeSync(namesrvAddr, request, timeoutMills);
         assert response != null;
         switch (response.getCode()) {
+            //如果成功
             case ResponseCode.SUCCESS: {
                 RegisterBrokerResponseHeader responseHeader =
                     (RegisterBrokerResponseHeader) response.decodeCommandCustomHeader(RegisterBrokerResponseHeader.class);
                 RegisterBrokerResult result = new RegisterBrokerResult();
+                //封装成功的结果
                 result.setMasterAddr(responseHeader.getMasterAddr());
                 result.setHaServerAddr(responseHeader.getHaServerAddr());
                 if (response.getBody() != null) {
+                    //解码，反序列化为Map
                     result.setKvTable(KVTable.decode(response.getBody(), KVTable.class));
                 }
                 return result;

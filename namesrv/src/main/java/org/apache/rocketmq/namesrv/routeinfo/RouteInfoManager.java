@@ -252,6 +252,9 @@ public class RouteInfoManager {
         }
     }
 
+    /**
+     * 注册Topic信息
+     */
     private void createAndUpdateQueueData(final String brokerName, final TopicConfig topicConfig) {
         QueueData queueData = new QueueData();
         queueData.setBrokerName(brokerName);
@@ -264,6 +267,7 @@ public class RouteInfoManager {
         if (null == queueDataList) {
             queueDataList = new LinkedList<QueueData>();
             queueDataList.add(queueData);
+            //放入topicTable记录
             this.topicQueueTable.put(topicConfig.getTopicName(), queueDataList);
             log.info("new topic registered, {} {}", topicConfig.getTopicName(), queueData);
         } else {

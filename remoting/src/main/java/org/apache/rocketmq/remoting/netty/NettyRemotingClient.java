@@ -68,6 +68,9 @@ import org.apache.rocketmq.remoting.exception.RemotingTimeoutException;
 import org.apache.rocketmq.remoting.exception.RemotingTooMuchRequestException;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 
+/**
+ * Netty客户端实现
+ */
 public class NettyRemotingClient extends NettyRemotingAbstract implements RemotingClient {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(RemotingHelper.ROCKETMQ_REMOTING);
 
@@ -580,6 +583,10 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         return true;
     }
 
+    /**
+     * 获取NameService的地址列表，有后台线程在维护
+     * @return
+     */
     @Override
     public List<String> getNameServerAddressList() {
         return this.namesrvAddrList.get();
@@ -624,6 +631,9 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         }
     }
 
+    /**
+     * 继承Netty的简单入站处理器
+     */
     class NettyClientHandler extends SimpleChannelInboundHandler<RemotingCommand> {
 
         @Override

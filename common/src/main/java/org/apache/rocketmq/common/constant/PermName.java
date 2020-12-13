@@ -16,10 +16,25 @@
  */
 package org.apache.rocketmq.common.constant;
 
+/**
+ * topic的读写配置
+ */
 public class PermName {
+    /**
+     * todo
+     */
     public static final int PERM_PRIORITY = 0x1 << 3;
+    /**
+     * 读
+     */
     public static final int PERM_READ = 0x1 << 2;
+    /**
+     * 写
+     */
     public static final int PERM_WRITE = 0x1 << 1;
+    /**
+     * todo 继承？
+     */
     public static final int PERM_INHERIT = 0x1 << 0;
 
     public static String perm2String(final int perm) {
