@@ -173,6 +173,7 @@ public class TopicConfigManager extends ConfigManager {
                     if (defaultTopicConfig != null) {
                         if (defaultTopic.equals(TopicValidator.AUTO_CREATE_TOPIC_KEY_TOPIC)) {
                             if (!this.brokerController.getBrokerConfig().isAutoCreateTopicEnable()) {
+                                //todo
                                 defaultTopicConfig.setPerm(PermName.PERM_READ | PermName.PERM_WRITE);
                             }
                         }
@@ -207,13 +208,13 @@ public class TopicConfigManager extends ConfigManager {
                     if (topicConfig != null) {
                         log.info("Create new topic by default topic:[{}] config:[{}] producer:[{}]",
                                 defaultTopic, topicConfig, remoteAddress);
-
+                        //创建topic
                         this.topicConfigTable.put(topic, topicConfig);
 
                         this.dataVersion.nextVersion();
 
                         createNew = true;
-
+                        //持久化到文件
                         this.persist();
                     }
                 } finally {

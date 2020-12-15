@@ -34,6 +34,8 @@ public class PermName {
     public static final int PERM_WRITE = 0x1 << 1;
     /**
      * todo 继承？
+     *
+     * 在没有topic broker自动创建时允许从defaultTopic继承属性
      */
     public static final int PERM_INHERIT = 0x1 << 0;
 

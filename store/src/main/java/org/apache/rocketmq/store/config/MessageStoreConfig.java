@@ -21,6 +21,9 @@ import org.apache.rocketmq.store.ConsumeQueue;
 
 import java.io.File;
 
+/**
+ * 配置大全 https://blog.csdn.net/wangjinduo35056/article/details/88351625
+ */
 public class MessageStoreConfig {
 
     /**
@@ -52,6 +55,9 @@ public class MessageStoreConfig {
 
     // CommitLog flush interval
     // flush data to disk
+    /**
+     * commitlog刷盘频率
+     */
     @ImportantField
     private int flushIntervalCommitLog = 500;
 
@@ -67,6 +73,9 @@ public class MessageStoreConfig {
     private boolean useReentrantLockWhenPutMessage = false;
 
     // Whether schedule flush,default is real-time
+    /**
+     * 表示await方法等待FlushIntervalCommitlog,如果为true表示使用Thread.sleep方法等待
+     */
     @ImportantField
     private boolean flushCommitLogTimed = false;
     // ConsumeQueue flush interval
@@ -95,14 +104,26 @@ public class MessageStoreConfig {
     // This check adds some overhead,so it may be disabled in cases seeking extreme performance.
     private boolean checkCRCOnRecover = true;
     // How many pages are to be flushed when flush CommitLog
+    /**
+     * 刷盘最少需要的脏页数
+     */
     private int flushCommitLogLeastPages = 4;
     // How many pages are to be committed when commit data to file
+    /**
+     * 一次提交至少需要脏页的数量,默认4页,针对 commitlog文件
+     */
     private int commitCommitLogLeastPages = 4;
     // Flush page size when the disk in warming state
     private int flushLeastPagesWhenWarmMapedFile = 1024 / 4 * 16;
     // How many pages are to be flushed when flush ConsumeQueue
     private int flushConsumeQueueLeastPages = 2;
+    /**
+     * commitlog两次刷盘的最大间隔,如果超过该间隔,将fushCommitLogLeastPages要求直接执行刷盘操作
+     */
     private int flushCommitLogThoroughInterval = 1000 * 10;
+    /**
+     * Commitlog两次提交的最大间隔,如果超过该间隔,将忽略commitCommitLogLeastPages直接提交
+     */
     private int commitCommitLogThoroughInterval = 200;
     private int flushConsumeQueueThoroughInterval = 1000 * 60;
     @ImportantField
@@ -164,6 +185,9 @@ public class MessageStoreConfig {
     private long osPageCacheBusyTimeOutMills = 1000;
     private int defaultQueryMaxNum = 32;
 
+    /**
+     * 如果开启了存储池化
+     */
     @ImportantField
     private boolean transientStorePoolEnable = false;
     private int transientStorePoolSize = 5;

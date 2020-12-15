@@ -259,6 +259,9 @@ public class MappedFile extends ReferenceResource {
         return appendMessagesInner(messageExtBatch, cb);
     }
 
+    /**
+     * 追加消息到CommitLog文件
+     */
     public AppendMessageResult appendMessagesInner(final MessageExt messageExt, final AppendMessageCallback cb) {
         assert messageExt != null;
         assert cb != null;
@@ -267,19 +270,26 @@ public class MappedFile extends ReferenceResource {
 
         if (currentPos < this.fileSize) {
             ByteBuffer byteBuffer = writeBuffer != null ? writeBuffer.slice() : this.mappedByteBuffer.slice();
+            //设置position
             byteBuffer.position(currentPos);
             AppendMessageResult result;
             if (messageExt instanceof MessageExtBrokerInner) {
+                //写单条消息到byteBuffer
                 result = cb.doAppend(this.getFileFromOffset(), byteBuffer, this.fileSize - currentPos, (MessageExtBrokerInner) messageExt);
             } else if (messageExt instanceof MessageExtBatch) {
+                //批量消息写入到byteBuffer
                 result = cb.doAppend(this.getFileFromOffset(), byteBuffer, this.fileSize - currentPos, (MessageExtBatch) messageExt);
             } else {
+                //位置类型
                 return new AppendMessageResult(AppendMessageStatus.UNKNOWN_ERROR);
             }
+            //增加写入位置标记
             this.wrotePosition.addAndGet(result.getWroteBytes());
+            //更新存储时间
             this.storeTimestamp = result.getStoreTimestamp();
             return result;
         }
+        //出现错误
         log.error("MappedFile.appendMessage return null, wrotePosition: {} fileSize: {}", currentPos, this.fileSize);
         return new AppendMessageResult(AppendMessageStatus.UNKNOWN_ERROR);
     }
@@ -361,11 +371,14 @@ public class MappedFile extends ReferenceResource {
     public int commit(final int commitLeastPages) {
         if (writeBuffer == null) {
             //no need to commit data to file channel, so just regard wrotePosition as committedPosition.
+            //没有需要提交的数据，直接返回已写的位置作为提交了的位置
             return this.wrotePosition.get();
         }
         if (this.isAbleToCommit(commitLeastPages)) {
             if (this.hold()) {
+                //提交
                 commit0(commitLeastPages);
+                //释放引用数
                 this.release();
             } else {
                 log.warn("in commit, hold failed, commit offset = " + this.committedPosition.get());
@@ -382,16 +395,20 @@ public class MappedFile extends ReferenceResource {
     }
 
     protected void commit0(final int commitLeastPages) {
+        //已经写了的位置
         int writePos = this.wrotePosition.get();
+        //已经提交了的位置
         int lastCommittedPosition = this.committedPosition.get();
 
-        if (writePos - this.committedPosition.get() > 0) {
+        if (writePos - this.committedPosition.get() > 0) {//表示有可提交的数据
             try {
-                ByteBuffer byteBuffer = writeBuffer.slice();
+                ByteBuffer byteBuffer = writeBuffer.slice();//切片
                 byteBuffer.position(lastCommittedPosition);
                 byteBuffer.limit(writePos);
+                //利用FileChannle写入文件
                 this.fileChannel.position(lastCommittedPosition);
                 this.fileChannel.write(byteBuffer);
+                //更新已提交位置
                 this.committedPosition.set(writePos);
             } catch (Throwable e) {
                 log.error("Error occurred when commit data to FileChannel.", e);
@@ -423,9 +440,10 @@ public class MappedFile extends ReferenceResource {
         }
 
         if (commitLeastPages > 0) {
+            //判断当前可提交数据是否达到脏页数
             return ((write / OS_PAGE_SIZE) - (flush / OS_PAGE_SIZE)) >= commitLeastPages;
         }
-
+        //当commitLeastPages为0时，就到这，只有有数据就可提交
         return write > flush;
     }
 

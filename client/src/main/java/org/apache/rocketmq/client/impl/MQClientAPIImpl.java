@@ -269,9 +269,17 @@ public class MQClientAPIImpl {
 
     }
 
+    /**
+     * 封装创建topic的请求，发送给broker
+     * @param addr borker地址
+     * @param defaultTopic 指定的已经存在的topic
+     * @param topicConfig 新topic的配置
+     * @param timeoutMillis timeout
+     */
     public void createTopic(final String addr, final String defaultTopic, final TopicConfig topicConfig,
         final long timeoutMillis)
         throws RemotingException, MQBrokerException, InterruptedException, MQClientException {
+        //创建请求头，并设置参数
         CreateTopicRequestHeader requestHeader = new CreateTopicRequestHeader();
         requestHeader.setTopic(topicConfig.getTopicName());
         requestHeader.setDefaultTopic(defaultTopic);
@@ -282,19 +290,21 @@ public class MQClientAPIImpl {
         requestHeader.setTopicSysFlag(topicConfig.getTopicSysFlag());
         requestHeader.setOrder(topicConfig.isOrder());
 
+        //包装为远程命令
         RemotingCommand request = RemotingCommand.createRequestCommand(RequestCode.UPDATE_AND_CREATE_TOPIC, requestHeader);
-
+        //同步调用
         RemotingCommand response = this.remotingClient.invokeSync(MixAll.brokerVIPChannel(this.clientConfig.isVipChannelEnabled(), addr),
             request, timeoutMillis);
         assert response != null;
         switch (response.getCode()) {
+            //创建成功
             case ResponseCode.SUCCESS: {
                 return;
             }
             default:
                 break;
         }
-
+        //失败抛出异常
         throw new MQClientException(response.getCode(), response.getRemark());
     }
 

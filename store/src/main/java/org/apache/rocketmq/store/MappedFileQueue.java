@@ -474,8 +474,10 @@ public class MappedFileQueue {
         boolean result = true;
         MappedFile mappedFile = this.findMappedFileByOffset(this.committedWhere, this.committedWhere == 0);
         if (mappedFile != null) {
+            //commit 指定数量的脏页
             int offset = mappedFile.commit(commitLeastPages);
             long where = mappedFile.getFileFromOffset() + offset;
+            //更新已提交位置
             result = where == this.committedWhere;
             this.committedWhere = where;
         }

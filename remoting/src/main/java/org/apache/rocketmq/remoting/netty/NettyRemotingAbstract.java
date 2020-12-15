@@ -195,16 +195,21 @@ public abstract class NettyRemotingAbstract {
                 @Override
                 public void run() {
                     try {
+                        //执行前Hook
                         doBeforeRpcHooks(RemotingHelper.parseChannelRemoteAddr(ctx.channel()), cmd);
+                        //创建Callback
                         final RemotingResponseCallback callback = new RemotingResponseCallback() {
                             @Override
                             public void callback(RemotingCommand response) {
+                                //执行后hook
                                 doAfterRpcHooks(RemotingHelper.parseChannelRemoteAddr(ctx.channel()), cmd, response);
+                                //如果不是oneway
                                 if (!cmd.isOnewayRPC()) {
                                     if (response != null) {
                                         response.setOpaque(opaque);
                                         response.markResponseType();
                                         try {
+                                            //会写response
                                             ctx.writeAndFlush(response);
                                         } catch (Throwable e) {
                                             log.error("process request over, but response failed", e);
@@ -218,10 +223,13 @@ public abstract class NettyRemotingAbstract {
                         };
                         if (pair.getObject1() instanceof AsyncNettyRequestProcessor) {
                             AsyncNettyRequestProcessor processor = (AsyncNettyRequestProcessor) pair.getObject1();
+                            //异步执行
                             processor.asyncProcessRequest(ctx, cmd, callback);
                         } else {
                             NettyRequestProcessor processor = pair.getObject1();
+                            //同步执行
                             RemotingCommand response = processor.processRequest(ctx, cmd);
+                            //调用callback
                             callback.callback(response);
                         }
                     } catch (Throwable e) {
@@ -229,6 +237,7 @@ public abstract class NettyRemotingAbstract {
                         log.error(cmd.toString());
 
                         if (!cmd.isOnewayRPC()) {
+                            //出现错误 响应
                             final RemotingCommand response = RemotingCommand.createResponseCommand(RemotingSysResponseCode.SYSTEM_ERROR,
                                     RemotingHelper.exceptionSimpleDesc(e));
                             response.setOpaque(opaque);
@@ -238,7 +247,9 @@ public abstract class NettyRemotingAbstract {
                 }
             };
 
+            //是否需要拒绝请求
             if (pair.getObject1().rejectRequest()) {
+                //响应系统繁忙
                 final RemotingCommand response = RemotingCommand.createResponseCommand(RemotingSysResponseCode.SYSTEM_BUSY,
                         "[REJECTREQUEST]system busy, start flow control for a while");
                 response.setOpaque(opaque);
@@ -247,6 +258,7 @@ public abstract class NettyRemotingAbstract {
             }
 
             try {
+                //封装为task
                 final RequestTask requestTask = new RequestTask(run, ctx.channel(), cmd);
                 //放入对应的线程池处理
                 pair.getObject2().submit(requestTask);
@@ -258,7 +270,7 @@ public abstract class NettyRemotingAbstract {
                             + " request code: " + cmd.getCode());
                 }
 
-                if (!cmd.isOnewayRPC()) {
+                if (!cmd.isOnewayRPC()) {//如果不是oneway 需要响应
                     final RemotingCommand response = RemotingCommand.createResponseCommand(RemotingSysResponseCode.SYSTEM_BUSY,
                             "[OVERLOAD]system busy, start flow control for a while");
                     response.setOpaque(opaque);

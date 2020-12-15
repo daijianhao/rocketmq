@@ -369,6 +369,12 @@ public class DefaultMessageStore implements MessageStore {
         }
     }
 
+    /**
+     * 检查msg一些信息
+     *
+     * @param msg
+     * @return
+     */
     private PutMessageStatus checkMessage(MessageExtBrokerInner msg) {
         if (msg.getTopic().length() > Byte.MAX_VALUE) {
             log.warn("putMessage message topic length too long " + msg.getTopic().length());
@@ -426,29 +432,39 @@ public class DefaultMessageStore implements MessageStore {
         return PutMessageStatus.PUT_OK;
     }
 
+    /**
+     * 异步put 消息
+     */
     @Override
     public CompletableFuture<PutMessageResult> asyncPutMessage(MessageExtBrokerInner msg) {
+        //检查MessageStore状态
         PutMessageStatus checkStoreStatus = this.checkStoreStatus();
         if (checkStoreStatus != PutMessageStatus.PUT_OK) {
+            //不ok直接返回返回
             return CompletableFuture.completedFuture(new PutMessageResult(checkStoreStatus, null));
         }
-
+        //检查Msg
         PutMessageStatus msgCheckStatus = this.checkMessage(msg);
         if (msgCheckStatus == PutMessageStatus.MESSAGE_ILLEGAL) {
+            //如果非法直接返回
             return CompletableFuture.completedFuture(new PutMessageResult(msgCheckStatus, null));
         }
 
         long beginTime = this.getSystemClock().now();
+        //异步putMsg到CommitLog
         CompletableFuture<PutMessageResult> putResultFuture = this.commitLog.asyncPutMessage(msg);
-
+        //设置完成后的操作
         putResultFuture.thenAccept((result) -> {
+            //流逝的时间
             long elapsedTime = this.getSystemClock().now() - beginTime;
             if (elapsedTime > 500) {
                 log.warn("putMessage not in lock elapsed time(ms)={}, bodyLength={}", elapsedTime, msg.getBody().length);
             }
+            //统计
             this.storeStatsService.setPutMessageEntireTimeMax(elapsedTime);
 
             if (null == result || !result.isOk()) {
+                //统计失败次数
                 this.storeStatsService.getPutMessageFailedTimes().incrementAndGet();
             }
         });
@@ -1467,6 +1483,9 @@ public class DefaultMessageStore implements MessageStore {
         return maxPhysicOffset;
     }
 
+    /**
+     * 恢复topic-queueId与offset的对应关系
+     */
     public void recoverTopicQueueTable() {
         HashMap<String/* topic-queueid */, Long/* offset */> table = new HashMap<String, Long>(1024);
         long minPhyOffset = this.commitLog.getMinOffset();
