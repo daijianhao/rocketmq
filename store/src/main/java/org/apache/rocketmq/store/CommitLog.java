@@ -1263,6 +1263,7 @@ public class CommitLog {
         MappedFile mappedFile = this.mappedFileQueue.findMappedFileByOffset(offset, offset == 0);
         if (mappedFile != null) {
             int pos = (int) (offset % mappedFileSize);
+            //取出指定size
             return mappedFile.selectMappedBuffer(pos, size);
         }
         return null;

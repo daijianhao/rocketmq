@@ -39,6 +39,9 @@ import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 import org.apache.rocketmq.store.QueryMessageResult;
 import org.apache.rocketmq.store.SelectMappedBufferResult;
 
+/**
+ * 负责处理查询消息
+ */
 public class QueryMessageProcessor extends AsyncNettyRequestProcessor implements NettyRequestProcessor {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
 
@@ -52,9 +55,9 @@ public class QueryMessageProcessor extends AsyncNettyRequestProcessor implements
     public RemotingCommand processRequest(ChannelHandlerContext ctx, RemotingCommand request)
         throws RemotingCommandException {
         switch (request.getCode()) {
-            case RequestCode.QUERY_MESSAGE:
+            case RequestCode.QUERY_MESSAGE://查询消息
                 return this.queryMessage(ctx, request);
-            case RequestCode.VIEW_MESSAGE_BY_ID:
+            case RequestCode.VIEW_MESSAGE_BY_ID://查看消息
                 return this.viewMessageById(ctx, request);
             default:
                 break;
@@ -68,8 +71,12 @@ public class QueryMessageProcessor extends AsyncNettyRequestProcessor implements
         return false;
     }
 
+    /**
+     * 查询消息
+     */
     public RemotingCommand queryMessage(ChannelHandlerContext ctx, RemotingCommand request)
         throws RemotingCommandException {
+        //构造响应
         final RemotingCommand response =
             RemotingCommand.createResponseCommand(QueryMessageResponseHeader.class);
         final QueryMessageResponseHeader responseHeader =
@@ -84,7 +91,7 @@ public class QueryMessageProcessor extends AsyncNettyRequestProcessor implements
         if (isUniqueKey != null && isUniqueKey.equals("true")) {
             requestHeader.setMaxNum(this.brokerController.getMessageStoreConfig().getDefaultQueryMaxNum());
         }
-
+        //取到查询结果
         final QueryMessageResult queryMessageResult =
             this.brokerController.getMessageStore().queryMessage(requestHeader.getTopic(),
                 requestHeader.getKey(), requestHeader.getMaxNum(), requestHeader.getBeginTimestamp(),

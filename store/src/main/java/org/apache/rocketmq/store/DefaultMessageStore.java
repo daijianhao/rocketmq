@@ -794,10 +794,11 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     public MessageExt lookMessageByOffset(long commitLogOffset) {
+        //通过偏移量从CommitLog中查找消息的size,这里只取4个字节
         SelectMappedBufferResult sbr = this.commitLog.getMessage(commitLogOffset, 4);
         if (null != sbr) {
             try {
-                // 1 TOTALSIZE
+                // 1 TOTALSIZE 取到消息总大小
                 int size = sbr.getByteBuffer().getInt();
                 return lookMessageByOffset(commitLogOffset, size);
             } finally {
@@ -961,6 +962,15 @@ public class DefaultMessageStore implements MessageStore {
         this.cleanCommitLogService.excuteDeleteFilesManualy();
     }
 
+    /**
+     * 查询消息
+     * @param topic  topic of the message.
+     * @param key    消息的key是业务开发同学在发送消息之前自行指定的，通常会把具有业务含义，区分度高的字段作为消息的key，如用户id，订单id等。
+     * @param maxNum maximum number of the messages possible.
+     * @param begin  begin timestamp.
+     * @param end    end timestamp.
+     * @return
+     */
     @Override
     public QueryMessageResult queryMessage(String topic, String key, int maxNum, long begin, long end) {
         QueryMessageResult queryMessageResult = new QueryMessageResult();
@@ -968,11 +978,13 @@ public class DefaultMessageStore implements MessageStore {
         long lastQueryMsgTime = end;
 
         for (int i = 0; i < 3; i++) {
+            //这里查询出的是msg在CommitLog中的偏移量
             QueryOffsetResult queryOffsetResult = this.indexService.queryOffset(topic, key, maxNum, begin, lastQueryMsgTime);
             if (queryOffsetResult.getPhyOffsets().isEmpty()) {
+                //没查到
                 break;
             }
-
+            //将偏移量排序
             Collections.sort(queryOffsetResult.getPhyOffsets());
 
             queryMessageResult.setIndexLastUpdatePhyoffset(queryOffsetResult.getIndexLastUpdatePhyoffset());
@@ -984,6 +996,7 @@ public class DefaultMessageStore implements MessageStore {
                 try {
 
                     boolean match = true;
+                    //根据偏移量查找消息
                     MessageExt msg = this.lookMessageByOffset(offset);
                     if (0 == m) {
                         lastQueryMsgTime = msg.getStoreTimestamp();
@@ -1005,6 +1018,7 @@ public class DefaultMessageStore implements MessageStore {
                             int size = result.getByteBuffer().getInt(0);
                             result.getByteBuffer().limit(size);
                             result.setSize(size);
+                            //加入结果集
                             queryMessageResult.addMessage(result);
                         }
                     } else {
@@ -1218,6 +1232,7 @@ public class DefaultMessageStore implements MessageStore {
         SelectMappedBufferResult sbr = this.commitLog.getMessage(commitLogOffset, size);
         if (null != sbr) {
             try {
+                //解码为消息对象
                 return MessageDecoder.decode(sbr.getByteBuffer(), true, false);
             } finally {
                 sbr.release();

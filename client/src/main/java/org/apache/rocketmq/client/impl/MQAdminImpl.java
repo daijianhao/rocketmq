@@ -305,9 +305,22 @@ public class MQAdminImpl {
         }
     }
 
+    /**
+     * 查询消息
+     * @param topic topic
+     * @param key todo MessageKey
+     * @param maxNum 最多返回的消息数，因为key是由用户设置的，并不保证唯一，所以可能取到多个消息；同时index中只存储了hash，所以hash相同的消息也会取出来
+     * @param begin 开始时间
+     * @param end 结束时间
+     * @param isUniqKey 是否唯一
+     * @return
+     * @throws MQClientException
+     * @throws InterruptedException
+     */
     protected QueryResult queryMessage(String topic, String key, int maxNum, long begin, long end,
                                        boolean isUniqKey) throws MQClientException,
             InterruptedException {
+        //获取topic
         TopicRouteData topicRouteData = this.mQClientFactory.getAnExistTopicRouteData(topic);
         if (null == topicRouteData) {
             this.mQClientFactory.updateTopicRouteInfoFromNameServer(topic);
@@ -317,6 +330,7 @@ public class MQAdminImpl {
         if (topicRouteData != null) {
             List<String> brokerAddrs = new LinkedList<String>();
             for (BrokerData brokerData : topicRouteData.getBrokerDatas()) {
+                //获取broker地址
                 String addr = brokerData.selectBrokerAddr();
                 if (addr != null) {
                     brokerAddrs.add(addr);
@@ -330,13 +344,14 @@ public class MQAdminImpl {
 
                 for (String addr : brokerAddrs) {
                     try {
+                        //构建查询请求头
                         QueryMessageRequestHeader requestHeader = new QueryMessageRequestHeader();
                         requestHeader.setTopic(topic);
                         requestHeader.setKey(key);
                         requestHeader.setMaxNum(maxNum);
                         requestHeader.setBeginTimestamp(begin);
                         requestHeader.setEndTimestamp(end);
-
+                        //发送查询请求
                         this.mQClientFactory.getMQClientAPIImpl().queryMessage(addr, requestHeader, timeoutMillis * 3,
                                 new InvokeCallback() {
                                     @Override
@@ -361,6 +376,7 @@ public class MQAdminImpl {
 
                                                         QueryResult qr = new QueryResult(responseHeader.getIndexLastUpdateTimestamp(), wrappers);
                                                         try {
+                                                            //封装查询结果
                                                             lock.writeLock().lock();
                                                             queryResultList.add(qr);
                                                         } finally {
@@ -449,6 +465,7 @@ public class MQAdminImpl {
                 }
 
                 if (!messageList.isEmpty()) {
+                    //返回查询结果
                     return new QueryResult(indexLastUpdateTimestamp, messageList);
                 } else {
                     throw new MQClientException(ResponseCode.NO_MESSAGE, "query message by key finished, but no message.");

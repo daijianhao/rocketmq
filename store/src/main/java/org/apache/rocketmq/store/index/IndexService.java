@@ -167,6 +167,9 @@ public class IndexService {
         }
     }
 
+    /**
+     * 查询消息
+     */
     public QueryOffsetResult queryOffset(String topic, String key, int maxNum, long begin, long end) {
         List<Long> phyOffsets = new ArrayList<Long>(maxNum);
 
@@ -178,14 +181,15 @@ public class IndexService {
             if (!this.indexFileList.isEmpty()) {
                 for (int i = this.indexFileList.size(); i > 0; i--) {
                     IndexFile f = this.indexFileList.get(i - 1);
+                    //是否到了最后一个IndexFile
                     boolean lastFile = i == this.indexFileList.size();
                     if (lastFile) {
                         indexLastUpdateTimestamp = f.getEndTimestamp();
                         indexLastUpdatePhyoffset = f.getEndPhyOffset();
                     }
 
-                    if (f.isTimeMatched(begin, end)) {
-
+                    if (f.isTimeMatched(begin, end)) {//如果时间匹配
+                        //查询对应的消息的物理偏移量
                         f.selectPhyOffset(phyOffsets, buildKey(topic, key), maxNum, begin, end, lastFile);
                     }
 

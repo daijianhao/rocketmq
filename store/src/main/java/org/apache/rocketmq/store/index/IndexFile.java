@@ -286,8 +286,11 @@ public class IndexFile {
     public void selectPhyOffset(final List<Long> phyOffsets, final String key, final int maxNum,
                                 final long begin, final long end, boolean lock) {
         if (this.mappedFile.hold()) {
+            //计算Hash
             int keyHash = indexKeyHashMethod(key);
+            //计算slot
             int slotPos = keyHash % this.hashSlotNum;
+            //计算slot偏移量
             int absSlotPos = IndexHeader.INDEX_HEADER_SIZE + slotPos * hashSlotSize;
 
             FileLock fileLock = null;
@@ -296,7 +299,7 @@ public class IndexFile {
                     // fileLock = this.fileChannel.lock(absSlotPos,
                     // hashSlotSize, true);
                 }
-
+                //取得slot下最新的index序号
                 int slotValue = this.mappedByteBuffer.getInt(absSlotPos);
                 // if (fileLock != null) {
                 // fileLock.release();
@@ -310,15 +313,17 @@ public class IndexFile {
                         if (phyOffsets.size() >= maxNum) {
                             break;
                         }
-
+                        //index所在位置
                         int absIndexPos =
                                 IndexHeader.INDEX_HEADER_SIZE + this.hashSlotNum * hashSlotSize
                                         + nextIndexToRead * indexSize;
-
+                        //index里存储的hash
                         int keyHashRead = this.mappedByteBuffer.getInt(absIndexPos);
+                        //msg在CommitLog中的偏移量
                         long phyOffsetRead = this.mappedByteBuffer.getLong(absIndexPos + 4);
-
+                        //与第一条的时间差
                         long timeDiff = (long) this.mappedByteBuffer.getInt(absIndexPos + 4 + 8);
+                        //前一条的索引位置
                         int prevIndexRead = this.mappedByteBuffer.getInt(absIndexPos + 4 + 8 + 4);
 
                         if (timeDiff < 0) {
@@ -331,6 +336,7 @@ public class IndexFile {
                         boolean timeMatched = (timeRead >= begin) && (timeRead <= end);
 
                         if (keyHash == keyHashRead && timeMatched) {
+                            //hash与时间都匹配就加入结果集
                             phyOffsets.add(phyOffsetRead);
                         }
 
@@ -339,7 +345,7 @@ public class IndexFile {
                                 || prevIndexRead == nextIndexToRead || timeRead < begin) {
                             break;
                         }
-
+                        //继续循环
                         nextIndexToRead = prevIndexRead;
                     }
                 }
