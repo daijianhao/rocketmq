@@ -25,7 +25,9 @@ public class SubscriptionGroupConfig {
 
     private boolean consumeEnable = true;
     private boolean consumeFromMinEnable = true;
-
+    /**
+     * 是否开启广播
+     */
     private boolean consumeBroadcastEnable = true;
 
     private int retryQueueNums = 1;

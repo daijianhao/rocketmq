@@ -54,6 +54,8 @@ import org.apache.rocketmq.store.schedule.ScheduleMessageService;
 
 /**
  * Store all metadata downtime for recovery, data protection reliability
+ *
+ * todo 这种实现方式还未了解
  */
 public class DLedgerCommitLog extends CommitLog {
     private final DLedgerServer dLedgerServer;

@@ -26,20 +26,45 @@ import org.apache.rocketmq.remoting.annotation.CFNullable;
 import org.apache.rocketmq.remoting.exception.RemotingCommandException;
 
 public class PullMessageRequestHeader implements CommandCustomHeader {
+
+    /**
+     * 消费者所在消费组
+     */
     @CFNotNull
     private String consumerGroup;
+    /**
+     * 要拉取的topic
+     */
     @CFNotNull
     private String topic;
+    /**
+     * 队列ID
+     */
     @CFNotNull
     private Integer queueId;
+    /**
+     * 队列偏移量，todo 应该是消息的序号吧
+     */
     @CFNotNull
     private Long queueOffset;
+    /**
+     * 要拉取的最大消息个数
+     */
     @CFNotNull
     private Integer maxMsgNums;
+    /**
+     * 一些标志位
+     */
     @CFNotNull
     private Integer sysFlag;
+    /**
+     * 要提交偏移量，todo rocketmq没有专门的提交已成功消费的offset的方法？而是在下次拉取的时候把上次的消费偏移带过来
+     */
     @CFNotNull
     private Long commitOffset;
+    /**
+     * 挂起的超时时间，todo 应该和长轮询有关吧
+     */
     @CFNotNull
     private Long suspendTimeoutMillis;
     @CFNullable

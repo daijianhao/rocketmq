@@ -205,7 +205,7 @@ public abstract class NettyRemotingAbstract {
                                 doAfterRpcHooks(RemotingHelper.parseChannelRemoteAddr(ctx.channel()), cmd, response);
                                 //如果不是oneway
                                 if (!cmd.isOnewayRPC()) {
-                                    if (response != null) {
+                                    if (response != null) {//不等于null时才写回对端（比如在未拉取到消息时会hold住请求，此时返回的是null）
                                         response.setOpaque(opaque);
                                         response.markResponseType();
                                         try {

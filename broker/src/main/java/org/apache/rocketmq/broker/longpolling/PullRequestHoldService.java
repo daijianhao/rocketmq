@@ -30,6 +30,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+/**
+ * 消息拉取请求的hold service
+ */
 public class PullRequestHoldService extends ServiceThread {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     private static final String TOPIC_QUEUEID_SEPARATOR = "@";
@@ -42,6 +45,9 @@ public class PullRequestHoldService extends ServiceThread {
         this.brokerController = brokerController;
     }
 
+    /**
+     * 挂起一个拉取请求
+     */
     public void suspendPullRequest(final String topic, final int queueId, final PullRequest pullRequest) {
         String key = this.buildKey(topic, queueId);
         ManyPullRequest mpr = this.pullRequestTable.get(key);
@@ -52,7 +58,7 @@ public class PullRequestHoldService extends ServiceThread {
                 mpr = prev;
             }
         }
-
+        //加入到拉取请求集合
         mpr.addPullRequest(pullRequest);
     }
 
@@ -78,6 +84,7 @@ public class PullRequestHoldService extends ServiceThread {
                 }
                 //开始时间
                 long beginLockTimestamp = this.systemClock.now();
+                //检查hold住的拉取请求
                 this.checkHoldRequest();
                 long costTime = this.systemClock.now() - beginLockTimestamp;
                 if (costTime > 5 * 1000) {
@@ -163,7 +170,7 @@ public class PullRequestHoldService extends ServiceThread {
                         }
                     }
                     //todo 后面暂未看
-                    if (System.currentTimeMillis() >= (request.getSuspendTimestamp() + request.getTimeoutMillis())) {
+                    if (System.currentTimeMillis() >= (request.getSuspendTimestamp() + request.getTimeoutMillis())) {//已经超时
                         try {
                             this.brokerController.getPullMessageProcessor().executeRequestWhenWakeup(request.getClientChannel(),
                                     request.getRequestCommand());

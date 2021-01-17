@@ -31,6 +31,9 @@ import org.apache.rocketmq.store.MessageFilter;
 import java.nio.ByteBuffer;
 import java.util.Map;
 
+/**
+ * 表达式消息过滤器
+ */
 public class ExpressionMessageFilter implements MessageFilter {
 
     protected static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.FILTER_LOGGER_NAME);
@@ -49,6 +52,7 @@ public class ExpressionMessageFilter implements MessageFilter {
             bloomDataValid = false;
             return;
         }
+        //布隆过滤器
         BloomFilter bloomFilter = this.consumerFilterManager.getBloomFilter();
         if (bloomFilter != null && bloomFilter.isValid(consumerFilterData.getBloomFilterData())) {
             bloomDataValid = true;
@@ -57,6 +61,12 @@ public class ExpressionMessageFilter implements MessageFilter {
         }
     }
 
+    /**
+     * 通过tagsCode和cqExtUnit来判断消息是否匹配
+     * @param tagsCode tagsCode
+     * @param cqExtUnit extend unit of consume queue
+     * @return
+     */
     @Override
     public boolean isMatchedByConsumeQueue(Long tagsCode, ConsumeQueueExt.CqExtUnit cqExtUnit) {
         if (null == subscriptionData) {
@@ -114,6 +124,9 @@ public class ExpressionMessageFilter implements MessageFilter {
         return true;
     }
 
+    /**
+     * 通过 CommitLog中的消息内容来判断是否匹配
+     */
     @Override
     public boolean isMatchedByCommitLog(ByteBuffer msgBuffer, Map<String, String> properties) {
         if (subscriptionData == null) {

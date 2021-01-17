@@ -467,6 +467,10 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         int sysFlag = PullSysFlag.buildSysFlag(
                 commitOffsetEnable, // commitOffset
                 true, // suspend
+                /**
+                 * {@link org.apache.rocketmq.broker.processor.PullMessageProcessor#processRequest(io.netty.channel.Channel, org.apache.rocketmq.remoting.protocol.RemotingCommand, boolean)}
+                 * todo 这里如果有 subExpression 则表示第一次订阅，没有则表示已经订阅过了；会导致在PullMesssageProcessor中有不同的处理
+                 */
                 subExpression != null, // subscription
                 classFilter // class filter
         );
