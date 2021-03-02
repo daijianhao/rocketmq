@@ -325,6 +325,7 @@ public class ProcessQueue {
                         if (entry != null) {
                             result.add(entry.getValue());
                             //临时存储，在处理消费结果时会用到
+                            //这一步是从msgTreeMap中移动指定数量的消息到consumingMsgOrderlyTreeMap中，并返回这部分消息。这么做的目的不是很理解。
                             consumingMsgOrderlyTreeMap.put(entry.getKey(), entry.getValue());
                         } else {
                             break;

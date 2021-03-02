@@ -704,6 +704,17 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                 this.offsetStore.load();
                 //10、消费服务，顺序和并发消息逻辑不同,接收消息并调用listener消费，处理消费结果
                 if (this.getMessageListenerInner() instanceof MessageListenerOrderly) {
+                    /**
+                     * 跟普通消息唯一的区别就是这里换成了ConsumeMessageOrderlyService。
+                     * 我们可以先回顾下之前讲过的consumer端逻辑：
+                     *
+                     * Consumer启动后会初始化一个RebalanceImpl做rebalance操作，
+                     * 从而得到当前这个consumer负责处理哪些queue的消息。
+                     * RebalanceImpl到broker拉取制定queue的消息，然后把消息按照queueId放到对
+                     * 应的本地的ProcessQueue缓存中
+                     * ConsumeMessageService调用listener处理消息，处理成功后清除掉
+                     */
+
                     //设置是否顺序消费标志位
                     this.consumeOrderly = true;
                     this.consumeMessageService =

@@ -174,6 +174,11 @@ public class ConsumerOffsetManager extends ConfigManager {
         }
     }
 
+    /**
+     * 将集群模式下的消费进度编码，进而可以持久化到磁盘
+     * @param prettyFormat
+     * @return
+     */
     public String encode(final boolean prettyFormat) {
         return RemotingSerializable.toJson(this, prettyFormat);
     }

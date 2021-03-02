@@ -45,6 +45,8 @@ import java.util.concurrent.*;
 
 /**
  * 顺序消费服务实现类
+ *
+ * 这里面Broker起到的作用仅仅是维护了queue的锁，其它操作对它都是透明的。
  */
 public class ConsumeMessageOrderlyService implements ConsumeMessageService {
     private static final InternalLogger log = ClientLogger.getLog();
@@ -79,13 +81,21 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
 
         this.scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl("ConsumeMessageScheduledThread_"));
     }
-
+    //定时检查锁定状态
     public void start() {
         if (MessageModel.CLUSTERING.equals(ConsumeMessageOrderlyService.this.defaultMQPushConsumerImpl.messageModel())) {
             this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
                 @Override
                 public void run() {
                     //todo 没懂
+                    /**
+                     * 这里，cosumer会周期性的发送lock queue的命令给Broker。
+                     * 前面提到，对于顺序消息，必须同一个queue的消息只有一个consumer来处理，
+                     * 所以为了保证这一点，consumer会在锁定queue成功后才开始消费，并且会一直更新这个锁。
+                     * 在这里broker起到了一个分布式锁的作用。consumer获取锁之后默认每20秒就会刷新一下锁，
+                     * broker如果发现锁超过1分钟没有刷新，则会自动释放，这时候其它consumer就可以抢到这个锁
+                     *
+                     */
                     ConsumeMessageOrderlyService.this.lockMQPeriodically();
                 }
             }, 1000 * 1, ProcessQueue.REBALANCE_LOCK_INTERVAL, TimeUnit.MILLISECONDS);
@@ -278,6 +288,7 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
                             consumeRequest.getMessageQueue());
                 case SUCCESS:
                     //提交，返回offset
+                    //如果成功，则调用ProcessQueue的commit方法
                     commitOffset = consumeRequest.getProcessQueue().commit();
                     //增加消费成功的TPS数，用于统计
                     this.getConsumerStatsManager().incConsumeOKTPS(consumerGroup, consumeRequest.getMessageQueue().getTopic(), msgs.size());
@@ -286,6 +297,7 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
                     //增加失败的tps数
                     this.getConsumerStatsManager().incConsumeFailedTPS(consumerGroup, consumeRequest.getMessageQueue().getTopic(), msgs.size());
                     //检查重新消费次数
+                    //检查重试次数，如果没超过则放到ProcessQueue中；如果超过则直接发到broker的Dead Queue中
                     if (checkReconsumeTimes(msgs)) {//返回是否需要暂停
                         //将消息重新放入ProcessQueue
                         //todo 顺序消息不会被重发到broker,而是不断在本地重试，因此要注意异常监控
@@ -343,7 +355,7 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
         }
 
         if (commitOffset >= 0 && !consumeRequest.getProcessQueue().isDropped()) {
-            //更新offset
+            //更新消费进度
             this.defaultMQPushConsumerImpl.getOffsetStore().updateOffset(consumeRequest.getMessageQueue(), commitOffset, false);
         }
 
@@ -458,6 +470,7 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
             /**
              * 其中维护了一个ConcurrentMap<MessageQueue, Object> mqLockTable，使得一个messageQueue对应一个锁对象object
              */
+            //1、获取消息Queue锁对象，加互斥锁，保证同一个MessageQueue同时只会有一个线程在处理消息
             final Object objLock = messageQueueLock.fetchLockObject(this.messageQueue);
             //加锁
             /**
@@ -469,6 +482,9 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
             synchronized (objLock) {
                 //todo 广播模式才支持？集群模式呢？这里判断条件是 或
                 //todo processQueue只有在被自己锁定时才能进行消费？
+                //todo 广播模式就不校验 ProcessQueue 是否已经锁住了？
+                //2、Cluster模式，检查ProcessQueue的状态是否仍然是已锁定
+                //对于集群模式下，检查一下当前ProcessQueue是否仍然持有queue的锁，只有持有锁才会处理消息。对于广播模式，锁是不需要的。
                 if (MessageModel.BROADCASTING.equals(ConsumeMessageOrderlyService.this.defaultMQPushConsumerImpl.messageModel())
                         //并且处理队列已经锁住并且锁未过期
                         || (this.processQueue.isLocked() && !this.processQueue.isLockExpired())) {
@@ -498,6 +514,7 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
                         }
 
                         //检查一下是否超时
+                        //3、如果本批次消费用时过长，则跳出循环，防止锁占用时间过长
                         long interval = System.currentTimeMillis() - beginTime;
                         if (interval > MAX_TIME_CONSUME_CONTINUOUSLY) {
                             ConsumeMessageOrderlyService.this.submitConsumeRequestLater(processQueue, messageQueue, 10);
@@ -509,6 +526,7 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
                                 ConsumeMessageOrderlyService.this.defaultMQPushConsumer.getConsumeMessageBatchMaxSize();
                         //todo 取出一批消息，rocketmq貌似只支持对消息一批一批的处理，不能对一批中的单个消息进行回滚等操作
                         //todo 但是因为有最大消费范围的限制，这样做好像也可以
+                        //从ProcessQueue获取一批消息
                         List<MessageExt> msgs = this.processQueue.takeMessages(consumeBatchSize);//从缓存队列取出一个批次的消息
                         //设置下topic和namespace
                         defaultMQPushConsumerImpl.resetRetryAndNamespace(msgs, defaultMQPushConsumer.getConsumerGroup());
@@ -538,6 +556,7 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
                             boolean hasException = false;
                             try {
                                 //锁住当前处理队列
+                                //5、获取processQueue的锁，防止处理过程中rebalanceService移除Queue
                                 this.processQueue.getLockConsume().lock();
                                 if (this.processQueue.isDropped()) {
                                     log.warn("consumeMessage, the message queue not be able to consume, because it's dropped. {}",

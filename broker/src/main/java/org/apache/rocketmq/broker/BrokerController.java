@@ -331,6 +331,7 @@ public class BrokerController {
                 @Override
                 public void run() {
                     try {
+                        //todo 这里会持久化集群模式下的消费进度（offset）到磁盘
                         BrokerController.this.consumerOffsetManager.persist();
                     } catch (Throwable e) {
                         log.error("schedule persist consumerOffset error.", e);

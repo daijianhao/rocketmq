@@ -1208,6 +1208,12 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                 String userTopic = NamespaceUtil.withoutNamespace(userMessage.getTopic(), mQClientFactory.getClientConfig().getNamespace());
                 userMessage.setTopic(userTopic);
 
+                /**
+                 * 在普通消息的发送逻辑中，queue的选择会采用系统的负载均衡策略，默认是采用轮询的方式，
+                 * 同时会将broker的延时参数计算进去（具体可以回顾下Producer那一章[传送门]）。
+                 * 而从上面的代码可以看出，queue的选择直接就是回调的用户的实现，后面的逻辑就跟普通消息一模一样了。
+                 *
+                 */
                 mq = mQClientFactory.getClientConfig().queueWithNamespace(selector.select(messageQueueList, userMessage, arg));
             } catch (Throwable e) {
                 throw new MQClientException("select message queue throwed exception.", e);
