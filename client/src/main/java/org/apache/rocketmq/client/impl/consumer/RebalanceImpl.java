@@ -46,7 +46,11 @@ import java.util.concurrent.ConcurrentMap;
  */
 public abstract class RebalanceImpl {
     protected static final InternalLogger log = ClientLogger.getLog();
+    /**
+     * topicSubscribeInfoTable只存放已经订阅了的topic对应的 MessageQueue
+     */
     protected final ConcurrentMap<MessageQueue, ProcessQueue> processQueueTable = new ConcurrentHashMap<MessageQueue, ProcessQueue>(64);
+
     protected final ConcurrentMap<String/* topic */, Set<MessageQueue>> topicSubscribeInfoTable =
             new ConcurrentHashMap<String, Set<MessageQueue>>();
     protected final ConcurrentMap<String /* topic */, SubscriptionData> subscriptionInner =
@@ -121,13 +125,14 @@ public abstract class RebalanceImpl {
 
     private HashMap<String/* brokerName */, Set<MessageQueue>> buildProcessQueueTableByBrokerName() {
         HashMap<String, Set<MessageQueue>> result = new HashMap<String, Set<MessageQueue>>();
+        //遍历本地ProcessQueue对应的所有MessageQueue
         for (MessageQueue mq : this.processQueueTable.keySet()) {
             Set<MessageQueue> mqs = result.get(mq.getBrokerName());
             if (null == mqs) {
                 mqs = new HashSet<MessageQueue>();
                 result.put(mq.getBrokerName(), mqs);
             }
-
+            //按broker分组，加入MessageQueue
             mqs.add(mq);
         }
 
@@ -169,6 +174,8 @@ public abstract class RebalanceImpl {
 
     /**
      * todo 将队列锁住，具体干什么呢？
+     *
+     * 只会锁住当前consumer订阅了的MessageQueue
      */
     public void lockAll() {
         HashMap<String, Set<MessageQueue>> brokerMqs = this.buildProcessQueueTableByBrokerName();
@@ -190,6 +197,9 @@ public abstract class RebalanceImpl {
                 requestBody.setMqSet(mqs);
 
                 try {
+                    /**
+                     * 遍历所有的broker，锁住指定mqs
+                     */
                     Set<MessageQueue> lockOKMQSet =
                             this.mQClientFactory.getMQClientAPIImpl().lockBatchMQ(findBrokerResult.getBrokerAddr(), requestBody, 1000);
 
@@ -199,7 +209,7 @@ public abstract class RebalanceImpl {
                             if (!processQueue.isLocked()) {
                                 log.info("the message queue locked OK, Group: {} {}", this.consumerGroup, mq);
                             }
-
+                            //锁住本地的处理队列
                             processQueue.setLocked(true);
                             processQueue.setLastLockTimestamp(System.currentTimeMillis());
                         }
@@ -208,6 +218,7 @@ public abstract class RebalanceImpl {
                         if (!lockOKMQSet.contains(mq)) {
                             ProcessQueue processQueue = this.processQueueTable.get(mq);
                             if (processQueue != null) {
+                                //对于没锁住的 打印警告日志
                                 processQueue.setLocked(false);
                                 log.warn("the message queue locked Failed, Group: {} {}", this.consumerGroup, mq);
                             }

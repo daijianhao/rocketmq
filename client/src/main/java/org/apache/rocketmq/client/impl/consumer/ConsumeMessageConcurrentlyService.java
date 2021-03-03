@@ -75,6 +75,9 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
     }
 
     public void start() {
+        /**
+         * 这里与顺序消费时启动的定时任务不一样，没有顺序消费时的加锁操作
+         */
         this.cleanExpireMsgExecutors.scheduleAtFixedRate(new Runnable() {
 
             @Override

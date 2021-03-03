@@ -41,6 +41,11 @@ import org.apache.rocketmq.store.config.BrokerRole;
 
 /**
  * EndTransaction processor: process commit and rollback message
+ *
+ *todo 事务消息通过2次消息确认和Producer回调用户本地事务，来解决用户业务逻辑和消息发送的原子性问题。
+ * 当前版本中事务消息因为性能问题取消了Broker对长时间未delete的Prepared消息的状态回查，
+ * 导致事务消息的高可用有所降低。如果要使用事务消息需要等待后期版本更新，或者用户自己实现回查逻辑。
+ *
  */
 public class EndTransactionProcessor extends AsyncNettyRequestProcessor implements NettyRequestProcessor {
     private static final InternalLogger LOGGER = InternalLoggerFactory.getLogger(LoggerName.TRANSACTION_LOGGER_NAME);
@@ -62,7 +67,7 @@ public class EndTransactionProcessor extends AsyncNettyRequestProcessor implemen
             LOGGER.warn("Message store is slave mode, so end transaction is forbidden. ");
             return response;
         }
-
+        //判断是来源于Producer主动发的消息还是Broker主动检查返回的消息，这里只用来记录日志
         if (requestHeader.getFromTransactionCheck()) {
             switch (requestHeader.getCommitOrRollback()) {
                 case MessageSysFlag.TRANSACTION_NOT_TYPE: {
@@ -123,19 +128,39 @@ public class EndTransactionProcessor extends AsyncNettyRequestProcessor implemen
             }
         }
         OperationResult result = new OperationResult();
+        //1、如果收到的是提交事务消息
         if (MessageSysFlag.TRANSACTION_COMMIT_TYPE == requestHeader.getCommitOrRollback()) {
+            //2、从commitLog中查出原始的prepared消息
             result = this.brokerController.getTransactionalMessageService().commitMessage(requestHeader);
             if (result.getResponseCode() == ResponseCode.SUCCESS) {
+                //3、检查获取到的消息是否和当前消息匹配（包括ProduceGroup、queueOffset、commitLogOffset）
+                /**
+                 * 当收到Commit消息时，Broker会根据消息中携带的offset信息去CommitLog中查出原来的Prepared消息，
+                 * 这也就是为什么Producer在发送最终的Commit消息的时候一定要指定是同一个Broker。
+                 * 消息查到后按照原来的topic和queueId，生成一条新的消息重新存到MessageStore，
+                 * 这样这条消息就跟普通消息一样，被Consumer收到了。
+                 *
+                 */
                 RemotingCommand res = checkPrepareMessage(result.getPrepareMessage(), requestHeader);
                 if (res.getCode() == ResponseCode.SUCCESS) {
+                    //4、使用原始的prepared消息属性，构建最终发给consumer的消息
                     MessageExtBrokerInner msgInner = endMessageTransaction(result.getPrepareMessage());
                     msgInner.setSysFlag(MessageSysFlag.resetTransactionValue(msgInner.getSysFlag(), requestHeader.getCommitOrRollback()));
                     msgInner.setQueueOffset(requestHeader.getTranStateTableOffset());
                     msgInner.setPreparedTransactionOffset(requestHeader.getCommitLogOffset());
                     msgInner.setStoreTimestamp(result.getPrepareMessage().getStoreTimestamp());
                     MessageAccessor.clearProperty(msgInner, MessageConst.PROPERTY_TRANSACTION_PREPARED);
+                    //5、调用MessageStore的消息存储接口提交消息，使用真正的topic和queueId
                     RemotingCommand sendResult = sendFinalMessage(msgInner);
                     if (sendResult.getCode() == ResponseCode.SUCCESS) {
+                        //6、设置Prepared消息的标记位为delete
+                        /**
+                         * 需要注意下，消息Commit后，理论上需要将原来的Prepared消息删除，
+                         * 这样Broker就能知道哪些消息一直没收到Commit/Rollback，需要去Producer回查状态。
+                         * 但是如果直接修改CommitLog文件，这个代价是很大的，所以RocketMQ是通过生成一个新
+                         * 的delete消息来标记的。这样，Broker在检查的时候只需要看下Prepared消息有没有对应的delete`消息就可以了
+                         *
+                         */
                         this.brokerController.getTransactionalMessageService().deletePrepareMessage(result.getPrepareMessage());
                     }
                     return sendResult;
@@ -143,10 +168,12 @@ public class EndTransactionProcessor extends AsyncNettyRequestProcessor implemen
                 return res;
             }
         } else if (MessageSysFlag.TRANSACTION_ROLLBACK_TYPE == requestHeader.getCommitOrRollback()) {
+            //7、收到的回滚事务消息
             result = this.brokerController.getTransactionalMessageService().rollbackMessage(requestHeader);
             if (result.getResponseCode() == ResponseCode.SUCCESS) {
                 RemotingCommand res = checkPrepareMessage(result.getPrepareMessage(), requestHeader);
                 if (res.getCode() == ResponseCode.SUCCESS) {
+                    //当收到Rollback事务消息，则不需要重新生成新消息发送，只需要将原来的消息标记位置成delete就可以了
                     this.brokerController.getTransactionalMessageService().deletePrepareMessage(result.getPrepareMessage());
                 }
                 return res;

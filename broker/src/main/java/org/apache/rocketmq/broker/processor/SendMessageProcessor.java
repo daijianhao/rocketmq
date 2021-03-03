@@ -345,6 +345,11 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
                 return CompletableFuture.completedFuture(response);
             }
             //按事务的HALF消息来处理
+            //存储prepare消息
+            /**
+             * Processor的代码中可以发现，针对Prepared消息是用的TransactionalMessageService来处理的，
+             * 最终还是跟普通消息一样调用的MessageStore的方法来存储消息到CommitLog，但是在存储之前对消息数据做了转换
+             */
             putMessageResult = this.brokerController.getTransactionalMessageService().asyncPrepareMessage(msgInner);
         } else {
             //todo 调用MessageStore接口存储消息

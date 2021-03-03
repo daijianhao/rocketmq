@@ -53,6 +53,7 @@ public class TransactionMQProducer extends DefaultMQProducer {
 
     @Override
     public void start() throws MQClientException {
+        //如果Producer未设置Executor，则默认初始化一个
         this.defaultMQProducerImpl.initTransactionEnv();
         super.start();
     }

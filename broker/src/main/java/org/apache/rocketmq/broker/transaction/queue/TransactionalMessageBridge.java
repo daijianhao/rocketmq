@@ -200,19 +200,30 @@ public class TransactionalMessageBridge {
         return store.asyncPutMessage(parseHalfMessageInner(messageInner));
     }
 
+    /**
+     * 在将消息存到MessageStore之前，会将原始的Topic和queueId放入自定义属性中，
+     * 然后将sysFlag设置成非事务消息，topic统一改成RMQ_SYS_TRANS_HALF_TOPIC,queueId设置为0。
+     * 这样所有的Prepared消息都会发到同一个topic的同一个queue下面。而且因为这个topic是系统内置的，
+     * consumer不会订阅这个topic的消息，所以Prepared的消息是不会被Consumer收到的
+     *
+     */
     private MessageExtBrokerInner parseHalfMessageInner(MessageExtBrokerInner msgInner) {
         MessageAccessor.putProperty(msgInner, MessageConst.PROPERTY_REAL_TOPIC, msgInner.getTopic());
         MessageAccessor.putProperty(msgInner, MessageConst.PROPERTY_REAL_QUEUE_ID,
             String.valueOf(msgInner.getQueueId()));
+        //清除sysFlag中的事务消息状态位
         msgInner.setSysFlag(
             MessageSysFlag.resetTransactionValue(msgInner.getSysFlag(), MessageSysFlag.TRANSACTION_NOT_TYPE));
+        //事务prepare消息放入统一的topic，RMQ_SYS_TRANS_HALF_TOPIC
         msgInner.setTopic(TransactionalMessageUtil.buildHalfTopic());
+        //queueId统一设置成0
         msgInner.setQueueId(0);
         msgInner.setPropertiesString(MessageDecoder.messageProperties2String(msgInner.getProperties()));
         return msgInner;
     }
 
     public boolean putOpMessage(MessageExt messageExt, String opType) {
+        //选择和Prepared消息相同的queueId
         MessageQueue messageQueue = new MessageQueue(messageExt.getTopic(),
             this.brokerController.getBrokerConfig().getBrokerName(), messageExt.getQueueId());
         if (TransactionalMessageUtil.REMOVETAG.equals(opType)) {
@@ -308,6 +319,8 @@ public class TransactionalMessageBridge {
      * @return This method will always return true.
      */
     private boolean addRemoveTagInTransactionOp(MessageExt messageExt, MessageQueue messageQueue) {
+        //message的topic为RMQ_SYS_TRANS_OP_HALF_TOPIC
+        //消息的tags值是d，body中存储的是prepared消息的queueOffset
         Message message = new Message(TransactionalMessageUtil.buildOpTopic(), TransactionalMessageUtil.REMOVETAG,
             String.valueOf(messageExt.getQueueOffset()).getBytes(TransactionalMessageUtil.charset));
         writeOp(message, messageQueue);

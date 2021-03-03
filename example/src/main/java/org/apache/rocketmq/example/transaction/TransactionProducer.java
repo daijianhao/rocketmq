@@ -42,8 +42,9 @@ public class TransactionProducer {
                 return thread;
             }
         });
-
+        //1、设置处理回查请求的executor
         producer.setExecutorService(executorService);
+        //2、设置本地事务Listener
         producer.setTransactionListener(transactionListener);
         producer.start();
 
@@ -53,6 +54,7 @@ public class TransactionProducer {
                 Message msg =
                     new Message("TopicTest1234", tags[i % tags.length], "KEY" + i,
                         ("Hello RocketMQ " + i).getBytes(RemotingHelper.DEFAULT_CHARSET));
+                //3、发送消息
                 SendResult sendResult = producer.sendMessageInTransaction(msg, null);
                 System.out.printf("%s%n", sendResult);
 
