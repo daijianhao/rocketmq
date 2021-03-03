@@ -1287,6 +1287,12 @@ public class CommitLog {
         this.mappedFileQueue.destroy();
     }
 
+    /**
+     * 将数据存入指定位置
+     * @param startOffset
+     * @param data
+     * @return
+     */
     public boolean appendData(long startOffset, byte[] data) {
         putMessageLock.lock();
         try {

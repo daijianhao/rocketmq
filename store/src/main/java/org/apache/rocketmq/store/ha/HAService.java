@@ -111,10 +111,15 @@ public class HAService {
     // this.groupTransferService.notifyTransferSome();
     // }
 
+    /**
+     * 启动高可用服务
+     */
     public void start() throws Exception {
+        //acceptSocketService负责接收slave同步请求
         this.acceptSocketService.beginAccept();
         this.acceptSocketService.start();
         this.groupTransferService.start();
+        //haClient负责从master消息数据，进行同步
         this.haClient.start();
     }
 
@@ -174,6 +179,7 @@ public class HAService {
         /**
          * Starts listening to slave connections.
          *
+         * 开始监听 slave 的连接
          * @throws Exception If fails.
          */
         public void beginAccept() throws Exception {
@@ -214,6 +220,7 @@ public class HAService {
                     if (selected != null) {
                         for (SelectionKey k : selected) {
                             if ((k.readyOps() & SelectionKey.OP_ACCEPT) != 0) {
+                                //获取到slave的channel
                                 SocketChannel sc = ((ServerSocketChannel) k.channel()).accept();
 
                                 if (sc != null) {
@@ -221,7 +228,9 @@ public class HAService {
                                         + sc.socket().getRemoteSocketAddress());
 
                                     try {
+                                        //建立连接对象
                                         HAConnection conn = new HAConnection(HAService.this, sc);
+                                        //会异步处理
                                         conn.start();
                                         HAService.this.addConnection(conn);
                                     } catch (Exception e) {
@@ -409,10 +418,11 @@ public class HAService {
 
         private boolean processReadEvent() {
             int readSizeZeroTimes = 0;
-            while (this.byteBufferRead.hasRemaining()) {
+            while (this.byteBufferRead.hasRemaining()) {//只要有没读完的数据
                 try {
+                    //继续读
                     int readSize = this.socketChannel.read(this.byteBufferRead);
-                    if (readSize > 0) {
+                    if (readSize > 0) {//读到了新数据
                         readSizeZeroTimes = 0;
                         boolean result = this.dispatchReadRequest();
                         if (!result) {
@@ -420,6 +430,7 @@ public class HAService {
                             return false;
                         }
                     } else if (readSize == 0) {
+                        //没读到 计数+1
                         if (++readSizeZeroTimes >= 3) {
                             break;
                         }
@@ -437,30 +448,36 @@ public class HAService {
         }
 
         private boolean dispatchReadRequest() {
+            //消息头大小 12字节
             final int msgHeaderSize = 8 + 4; // phyoffset + size
             int readSocketPos = this.byteBufferRead.position();
 
             while (true) {
+                //当前数据结束的位置-已经处理的位置
                 int diff = this.byteBufferRead.position() - this.dispatchPosition;
-                if (diff >= msgHeaderSize) {
+                if (diff >= msgHeaderSize) {//大于消息头，说明有完整的返回了
+                    //从上次处理了的位置接着读
                     long masterPhyOffset = this.byteBufferRead.getLong(this.dispatchPosition);
                     int bodySize = this.byteBufferRead.getInt(this.dispatchPosition + 8);
 
                     long slavePhyOffset = HAService.this.defaultMessageStore.getMaxPhyOffset();
 
                     if (slavePhyOffset != 0) {
-                        if (slavePhyOffset != masterPhyOffset) {
+                        if (slavePhyOffset != masterPhyOffset) {//说明同步不一致，有问题
                             log.error("master pushed offset not equal the max phy offset in slave, SLAVE: "
                                 + slavePhyOffset + " MASTER: " + masterPhyOffset);
                             return false;
                         }
                     }
 
-                    if (diff >= (msgHeaderSize + bodySize)) {
+                    if (diff >= (msgHeaderSize + bodySize)) {//消息是完整的
                         byte[] bodyData = new byte[bodySize];
                         this.byteBufferRead.position(this.dispatchPosition + msgHeaderSize);
+                        //读取消息体
                         this.byteBufferRead.get(bodyData);
-
+                        //将消息存CommitLog
+                        //todo 因为reputService是通过检测 CommitLog的偏移量变化来判断是否有新的消息的，所以这里直接将消息数据放入CommitLog
+                        //todo 其他相关的Index等数据自然会跟着创建
                         HAService.this.defaultMessageStore.appendToCommitLog(masterPhyOffset, bodyData);
 
                         this.byteBufferRead.position(readSocketPos);
@@ -554,9 +571,11 @@ public class HAService {
 
             while (!this.isStopped()) {
                 try {
+                    //连接上master
                     if (this.connectMaster()) {
 
                         if (this.isTimeToReportOffset()) {
+                            //上报当前slave的最大offset
                             boolean result = this.reportSlaveMaxOffset(this.currentReportedOffset);
                             if (!result) {
                                 this.closeMaster();
@@ -564,7 +583,7 @@ public class HAService {
                         }
 
                         this.selector.select(1000);
-
+                        //处理可读事件，即获取master返回的消息数据
                         boolean ok = this.processReadEvent();
                         if (!ok) {
                             this.closeMaster();
