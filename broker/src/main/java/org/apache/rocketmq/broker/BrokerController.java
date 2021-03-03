@@ -888,6 +888,9 @@ public class BrokerController {
         }
 
         if (!messageStoreConfig.isEnableDLegerCommitLog()) {
+            /**
+             * 开启事务状态回查处理器，即当节点为主节点时，开启对应的事务状态回查处理器，对PREPARE状态的消息发起事务状态回查请求
+             */
             startProcessorByHa(messageStoreConfig.getBrokerRole());
             handleSlaveSynchronize(messageStoreConfig.getBrokerRole());
             //注册broker到nameserv
@@ -1244,6 +1247,9 @@ public class BrokerController {
         log.info("Finish to change to master brokerName={}", brokerConfig.getBrokerName());
     }
 
+    /**
+     * 开启事务状态回查处理器，即当节点为主节点时，开启对应的事务状态回查处理器，对PREPARE状态的消息发起事务状态回查请求
+     */
     private void startProcessorByHa(BrokerRole role) {
         if (BrokerRole.SLAVE != role) {
             if (this.transactionalMessageCheckService != null) {

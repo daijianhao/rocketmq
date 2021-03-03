@@ -58,6 +58,9 @@ public abstract class AbstractTransactionalMessageCheckListener {
         this.brokerController = brokerController;
     }
 
+    /**
+     * 发送回查事务状态的消息
+     */
     public void sendCheckMessage(MessageExt msgExt) throws Exception {
         CheckTransactionStateRequestHeader checkTransactionStateRequestHeader = new CheckTransactionStateRequestHeader();
         checkTransactionStateRequestHeader.setCommitLogOffset(msgExt.getCommitLogOffset());
@@ -82,6 +85,7 @@ public abstract class AbstractTransactionalMessageCheckListener {
             @Override
             public void run() {
                 try {
+                    //todo 异步执行回查消息
                     sendCheckMessage(msgExt);
                 } catch (Exception e) {
                     LOGGER.error("Send check message error!", e);
